@@ -1,12 +1,34 @@
 # Gmail Agent - Cloud Deployment Script
 
-# Configuration
-$PROJECT_ID = "serp-425005"  # Replace with your actual Project ID
-$REGION = "us-central1"
-$SERVICE_NAME = "gmail-agent"
-$JOB_NAME = "gmail-agent-daily-trigger"
-$SCHEDULE = "0 2 * * *"  # Run at 2:00 AM every day
-$TIMEZONE = "Asia/Seoul" # Set to your timezone
+# Load configuration from .env file
+if (-not (Test-Path ".env")) {
+    Write-Error ".env file not found. Please create it with required variables."
+    Write-Host "Required variables in .env:"
+    Write-Host "  GCP_PROJECT_ID=your-project-id"
+    exit 1
+}
+
+# Read .env file and set variables
+Get-Content .env | ForEach-Object {
+    if ($_ -match '^\s*([^#][^=]*)\s*=\s*(.*)$') {
+        $name = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        Set-Variable -Name $name -Value $value -Scope Script
+    }
+}
+
+# Configuration (can be overridden in .env)
+if (-not $GCP_PROJECT_ID) {
+    Write-Error "GCP_PROJECT_ID not set in .env file"
+    exit 1
+}
+
+$PROJECT_ID = $GCP_PROJECT_ID
+$REGION = if ($GCP_REGION) { $GCP_REGION } else { "us-central1" }
+$SERVICE_NAME = if ($SERVICE_NAME) { $SERVICE_NAME } else { "gmail-agent" }
+$JOB_NAME = if ($JOB_NAME) { $JOB_NAME } else { "gmail-agent-daily-trigger" }
+$SCHEDULE = if ($SCHEDULE) { $SCHEDULE } else { "0 2 * * *" }  # Run at 2:00 AM every day
+$TIMEZONE = if ($TIMEZONE) { $TIMEZONE } else { "Asia/Seoul" }  # Set to your timezone
 
 Write-Host "Deploying Gmail Agent to Google Cloud..." -ForegroundColor Green
 

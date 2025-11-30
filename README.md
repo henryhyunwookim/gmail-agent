@@ -26,7 +26,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/henryhyunwookim/gmail-agent.git
 cd gmail-agent
 ```
 
@@ -48,10 +48,24 @@ pip install -r requirements.txt
 
 1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. Create an API key
-3. Create a `.env` file in the project root:
+3. Copy `.env.example` to `.env`:
+
+```bash
+cp .env.example .env
+```
+
+4. Edit `.env` and add your API key and GCP configuration:
 
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY=your_actual_api_key
+
+# GCP Configuration (needed for cloud deployment)
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_REGION=us-central1
+SERVICE_NAME=gmail-agent
+JOB_NAME=gmail-agent-daily-trigger
+SCHEDULE=0 2 * * *
+TIMEZONE=Asia/Seoul
 ```
 
 ### 5. Authenticate Gmail
@@ -87,11 +101,7 @@ This will:
 
 ### Deploy
 
-1. Edit `deploy_cloud.ps1` and set your project ID:
-
-```powershell
-$PROJECT_ID = "your-project-id"
-```
+1. Ensure your `.env` file has the correct `GCP_PROJECT_ID` set
 
 2. Run the deployment script:
 
