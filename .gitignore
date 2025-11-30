@@ -1,0 +1,42 @@
+# Sensitive files - DO NOT COMMIT
+credentials.json
+token.json
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Google Cloud
+.gcloudignore
+
+# Misc
+.pytest_cache/
+.coverage
+htmlcov/
