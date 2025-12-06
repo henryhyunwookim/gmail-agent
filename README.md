@@ -7,7 +7,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 - 🤖 **AI-Powered Summarization**: Uses Gemini 2.0 Flash to create concise email summaries
 - 💡 **Section-Based Insights**: Breaks down emails into logical sections with topics and key insights
 - 🎯 **Action Detection**: Automatically identifies emails requiring your attention
-- 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ToCheck`) based on email analysis
+- 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ReadLater`) based on email analysis
 - 🧵 **Thread Continuity**: Summaries appear in the original email thread
 - 🔍 **Smart Filtering**:
   - Skips self-sent emails
@@ -93,7 +93,7 @@ This will:
 - Check for unread emails (up to 50)
 - Summarize them using Gemini AI with section-based insights
 - Forward summaries to your email within the original thread
-- Apply Gmail labels (`ActionRequired` or `ToCheck`)
+- Apply Gmail labels (`ActionRequired` or `ReadLater`)
 - Display processing statistics
 
 ## Cloud Deployment (Google Cloud Run)

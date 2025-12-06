@@ -117,7 +117,7 @@ Reason: {analysis['reason']}{unsubscribe_section}
         client.forward_message(msg['id'], user_email, summary_text)
         
         # Apply label based on action_required
-        label = 'ActionRequired' if analysis['action_required'] else 'ToCheck'
+        label = 'ActionRequired' if analysis['action_required'] else 'ReadLater'
         client.add_label(msg['id'], label)
         
         stats['processed'] += 1
