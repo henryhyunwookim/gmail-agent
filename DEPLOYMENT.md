@@ -12,9 +12,11 @@ This guide covers multiple approaches to deploy your Gmail agent for real-time i
 Create `run_agent.bat` in your project directory:
 ```batch
 @echo off
-cd /d "d:\OneDrive\GitHub\gmail-agent"
-python src/main.py >> logs/agent.log 2>&1
+cd /d "%~dp0"
+python -m src.main >> logs/agent.log 2>&1
 ```
+
+> **Note**: `%~dp0` automatically uses the directory where the batch file is located.
 
 2. **Create logs directory**:
 ```bash
@@ -43,8 +45,10 @@ mkdir logs
    - **Actions tab**:
      - Click "New"
      - Action: "Start a program"
-     - Program/script: `d:\OneDrive\GitHub\gmail-agent\run_agent.bat`
-     - Start in: `d:\OneDrive\GitHub\gmail-agent`
+     - Program/script: `C:\path\to\gmail-agent\run_agent.bat`
+     - Start in: `C:\path\to\gmail-agent`
+     
+     > **Note**: Replace `C:\path\to\gmail-agent` with your actual project path.
    
    - **Conditions tab**:
      - Uncheck "Start the task only if the computer is on AC power"
@@ -146,7 +150,7 @@ if __name__ == "__main__":
 **Windows (using NSSM)**:
 ```bash
 # Download NSSM: https://nssm.cc/download
-nssm install GmailAgent "python" "d:\OneDrive\GitHub\gmail-agent\src\monitor.py"
+nssm install GmailAgent "python" "C:\path\to\gmail-agent\src\monitor.py"
 nssm start GmailAgent
 ```
 
@@ -208,14 +212,14 @@ Get-Content logs\agent.log -Wait -Tail 20
 Add to `run_agent.bat`:
 ```batch
 @echo off
-cd /d "d:\OneDrive\GitHub\gmail-agent"
+cd /d "%~dp0"
 
 REM Rotate logs if > 10MB
 for %%A in (logs\agent.log) do if %%~zA gtr 10485760 (
     move logs\agent.log logs\agent_%date:~-4,4%%date:~-10,2%%date:~-7,2%.log
 )
 
-python src/main.py >> logs/agent.log 2>&1
+python -m src.main >> logs/agent.log 2>&1
 ```
 
 ---
