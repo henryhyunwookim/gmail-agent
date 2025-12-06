@@ -86,6 +86,19 @@ def main():
         print(f"Action Required: {analysis['action_required']}")
         
         # Construct summary text for forwarding
+        unsubscribe_section = ""
+        if analysis.get('unsubscribe_link'):
+            unsubscribe_section = f"\n\nUnsubscribe Link: {analysis['unsubscribe_link']}\n"
+        
+        # Format insights section
+        insights_section = ""
+        if analysis.get('sections') and len(analysis['sections']) > 0:
+            insights_section = "\n\nInsights:\n"
+            for section in analysis['sections']:
+                topic = section.get('topic', 'Unknown')
+                insight = section.get('insight', 'No insight provided')
+                insights_section += f"• {topic}: {insight}\n"
+        
         summary_text = f"""
 === EMAIL SUMMARY ===
 
@@ -93,17 +106,19 @@ Original Sender: {content['sender']}
 Subject: {content['subject']}
 
 Summary:
-{analysis['summary']}
-
+{analysis['summary']}{insights_section}
 Action Required: {'YES' if analysis['action_required'] else 'NO'}
-Reason: {analysis['reason']}
-
+Reason: {analysis['reason']}{unsubscribe_section}
 ========================
 """
         
         # Forward the original email with summary
         print(f"Forwarding to {user_email}...")
         client.forward_message(msg['id'], user_email, summary_text)
+        
+        # Apply label based on action_required
+        label = 'ActionRequired' if analysis['action_required'] else 'ToCheck'
+        client.add_label(msg['id'], label)
         
         stats['processed'] += 1
         

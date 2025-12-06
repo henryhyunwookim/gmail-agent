@@ -5,14 +5,17 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 ## Features
 
 - 🤖 **AI-Powered Summarization**: Uses Gemini 2.0 Flash to create concise email summaries
+- 💡 **Section-Based Insights**: Breaks down emails into logical sections with topics and key insights
 - 🎯 **Action Detection**: Automatically identifies emails requiring your attention
+- 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ToCheck`) based on email analysis
 - 🧵 **Thread Continuity**: Summaries appear in the original email thread
 - 🔍 **Smart Filtering**:
   - Skips self-sent emails
   - Filters out purchase/transactional emails (Amazon, PayPal, etc.)
-  - Prevents duplicate summaries
+  - Prevents duplicate summaries in threads
+- 🔗 **Unsubscribe Detection**: Automatically extracts and includes unsubscribe links in summaries
 - ☁️ **Cloud Deployment**: Runs on Google Cloud Run (Free Tier eligible)
-- ⏰ **Scheduled Execution**: Automatically processes emails daily at 2:00 AM
+- ⏰ **Scheduled Execution**: Automatically processes emails daily at 5:00 AM
 
 ## Prerequisites
 
@@ -73,7 +76,7 @@ TIMEZONE=Asia/Seoul
 Run the agent locally once to authenticate:
 
 ```bash
-python src/main.py
+python -m src.main
 ```
 
 This will open a browser window for Gmail authentication and create `token.json`.
@@ -83,14 +86,15 @@ This will open a browser window for Gmail authentication and create `token.json`
 Run the agent manually:
 
 ```bash
-python src/main.py
+python -m src.main
 ```
 
 This will:
-- Check for unread emails
-- Summarize them using Gemini AI
-- Forward summaries to your email
-- Display statistics
+- Check for unread emails (up to 50)
+- Summarize them using Gemini AI with section-based insights
+- Forward summaries to your email within the original thread
+- Apply Gmail labels (`ActionRequired` or `ToCheck`)
+- Display processing statistics
 
 ## Cloud Deployment (Google Cloud Run)
 
@@ -111,7 +115,7 @@ This will:
 
 The script will:
 - Build and deploy the container to Cloud Run
-- Create a Cloud Scheduler job to run daily at 2:00 AM
+- Create a Cloud Scheduler job to run daily at 5:00 AM
 - Set up all necessary permissions
 
 ### Verify Deployment
@@ -143,7 +147,7 @@ messages = client.list_unread_messages(max_results=50)  # Change this number
 Edit `deploy_cloud.ps1`:
 
 ```powershell
-$SCHEDULE = "0 2 * * *"  # Cron format: daily at 2:00 AM
+$SCHEDULE = "0 5 * * *"  # Cron format: daily at 5:00 AM
 $TIMEZONE = "Asia/Seoul"  # Your timezone
 ```
 

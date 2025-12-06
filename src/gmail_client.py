@@ -27,6 +27,11 @@ class GmailClient:
             
             # Check if any message in the thread is a forward from the user with "Fwd:" subject
             for msg in messages:
+                # Skip messages in trash
+                label_ids = msg.get('labelIds', [])
+                if 'TRASH' in label_ids:
+                    continue
+                
                 headers = msg.get('payload', {}).get('headers', [])
                 subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '')
                 sender = next((h['value'] for h in headers if h['name'] == 'From'), '')
@@ -156,3 +161,40 @@ class GmailClient:
                 userId='me', id=msg_id, body={'removeLabelIds': ['UNREAD']}).execute()
         except HttpError as error:
             print(f'An error occurred: {error}')
+    
+    def get_or_create_label(self, label_name):
+        """Gets or creates a Gmail label by name."""
+        try:
+            # List all labels
+            results = self.service.users().labels().list(userId='me').execute()
+            labels = results.get('labels', [])
+            
+            # Check if label exists
+            for label in labels:
+                if label['name'] == label_name:
+                    return label['id']
+            
+            # Create label if it doesn't exist
+            label_object = {
+                'name': label_name,
+                'labelListVisibility': 'labelShow',
+                'messageListVisibility': 'show'
+            }
+            created_label = self.service.users().labels().create(userId='me', body=label_object).execute()
+            print(f'Created new label: {label_name}')
+            return created_label['id']
+        except HttpError as error:
+            print(f'An error occurred getting/creating label: {error}')
+            return None
+    
+    def add_label(self, msg_id, label_name):
+        """Adds a label to a message."""
+        try:
+            label_id = self.get_or_create_label(label_name)
+            if label_id:
+                self.service.users().messages().modify(
+                    userId='me', id=msg_id, body={'addLabelIds': [label_id]}).execute()
+                print(f'Applied label: {label_name}')
+        except HttpError as error:
+            print(f'An error occurred adding label: {error}')
+

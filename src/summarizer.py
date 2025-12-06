@@ -7,6 +7,29 @@ class EmailSummarizer:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.0-flash')
     
+    def extract_unsubscribe_link(self, email_body):
+        """Extracts unsubscribe link from email body if present."""
+        import re
+        
+        # Common unsubscribe link patterns
+        patterns = [
+            r'https?://[^\s<>"]+?unsubscribe[^\s<>"]*',
+            r'https?://[^\s<>"]+?optout[^\s<>"]*',
+            r'https?://[^\s<>"]+?opt-out[^\s<>"]*',
+            r'https?://[^\s<>"]+?remove[^\s<>"]*',
+            r'https?://[^\s<>"]+?preferences[^\s<>"]*',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, email_body, re.IGNORECASE)
+            if match:
+                link = match.group(0)
+                # Clean up trailing punctuation or HTML artifacts
+                link = re.sub(r'[,;.)\]]+$', '', link)
+                return link
+        
+        return None
+    
     def is_purchase_email(self, email_content):
         """Quickly determines if an email is purchase/transactional related."""
         # Quick keyword check first
@@ -39,22 +62,33 @@ class EmailSummarizer:
 
     def summarize(self, email_content):
         """Summarizes the email and determines if action is required."""
-        prompt = f"""You are an intelligent email assistant. Analyze the following email and provide a response.
+        # Extract unsubscribe link
+        unsubscribe_link = self.extract_unsubscribe_link(email_content['body'])
+        
+        prompt = f"""You are an intelligent email assistant. Analyze the following email and provide a structured response.
 
 Email Subject: {email_content['subject']}
 Email Sender: {email_content['sender']}
 Email Body:
-{email_content['body'][:2000]}
+{email_content['body'][:4000]}
 
 IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additional text):
 {{
-    "summary": "A concise 1-2 sentence summary of the email content",
+    "summary": "A concise 1-2 sentence overall summary of the email",
+    "sections": [
+        {{
+            "topic": "Topic or theme of this section",
+            "insight": "Key insight, information, or takeaway from this section"
+        }}
+    ],
     "action_required": true,
     "reason": "Brief explanation of why action is or isn't required"
 }}
 
 Rules:
-- summary: Concise overview of the email (1-2 sentences)
+- summary: Concise overall summary of the email (1-2 sentences)
+- sections: Break down the email into logical sections. For short emails, create 1 section. For longer emails with multiple topics, create multiple sections (2-5 sections)
+- Each section must have a "topic" (the subject/theme) and an "insight" (the key information or takeaway)
 - action_required: true if the email requires a response or action from the recipient, false otherwise
 - reason: Brief explanation (one sentence)
 - Output ONLY the JSON object, nothing else
@@ -72,13 +106,17 @@ Rules:
             
             # Try to parse JSON
             try:
-                return json.loads(text)
+                result = json.loads(text)
+                result['unsubscribe_link'] = unsubscribe_link
+                return result
             except json.JSONDecodeError:
                 # If JSON parsing fails, try to extract JSON from the text
                 import re
                 json_match = re.search(r'\{[^{}]*"summary"[^{}]*"action_required"[^{}]*"reason"[^{}]*\}', text, re.DOTALL)
                 if json_match:
-                    return json.loads(json_match.group(0))
+                    result = json.loads(json_match.group(0))
+                    result['unsubscribe_link'] = unsubscribe_link
+                    return result
                 else:
                     raise ValueError("Could not extract valid JSON from response")
                     
@@ -90,5 +128,6 @@ Rules:
             return {
                 "summary": "Error summarizing email.",
                 "action_required": False,
-                "reason": "AI processing failed."
+                "reason": "AI processing failed.",
+                "unsubscribe_link": unsubscribe_link
             }
