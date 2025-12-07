@@ -15,7 +15,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
   - Prevents duplicate summaries in threads
 - 🔗 **Unsubscribe Detection**: Automatically extracts and includes unsubscribe links in summaries
 - ☁️ **Cloud Deployment**: Runs on Google Cloud Run (Free Tier eligible)
-- ⏰ **Scheduled Execution**: Automatically processes emails daily at 5:00 AM
+- ⏰ **Scheduled Execution**: Automatically processes emails twice daily at 5:00 AM and 5:00 PM
 
 ## Prerequisites
 
@@ -115,7 +115,7 @@ This will:
 
 The script will:
 - Build and deploy the container to Cloud Run
-- Create a Cloud Scheduler job to run daily at 5:00 AM
+- Create a Cloud Scheduler job to run twice daily at 5:00 AM and 5:00 PM
 - Set up all necessary permissions
 
 ### Verify Deployment
@@ -182,10 +182,10 @@ gmail-agent/
 
 ## Cost Estimate
 
-Running once per day on Google Cloud Run:
+Running twice per day on Google Cloud Run:
 
-- **Cloud Run**: $0.00/month (within free tier)
-- **Cloud Scheduler**: $0.00/month (3 jobs free)
+- **Cloud Run**: $0.00/month (within free tier - 60 runs/month vs 2M limit)
+- **Cloud Scheduler**: $0.00/month (1 job vs 3 jobs free)
 - **Gemini API**: $0.00/month (generous free tier)
 
 **Total**: Free! 🎉

@@ -197,4 +197,49 @@ class GmailClient:
                 print(f'Applied label: {label_name}')
         except HttpError as error:
             print(f'An error occurred adding label: {error}')
+    
+    def send_execution_log(self, to, stats, errors=None, execution_time="Unknown"):
+        """Sends an execution summary email with statistics and errors."""
+        try:
+            from datetime import datetime
+            
+            # Format the execution summary
+            status = "✅ SUCCESS" if not errors else "❌ FAILED"
+            
+            error_section = ""
+            if errors:
+                error_section = f"\n\n🚨 ERRORS:\n{errors}\n"
+            
+            body = f"""
+Gmail Agent Execution Log
+========================
+
+Status: {status}
+Execution Time: {execution_time}
+
+📊 STATISTICS:
+--------------
+Total unread emails: {stats.get('total', 0)}
+Filtered (self-sent): {stats.get('self_sent', 0)}
+Filtered (purchase): {stats.get('purchase', 0)}
+Filtered (already summarized): {stats.get('already_summarized', 0)}
+Processed & forwarded: {stats.get('processed', 0)}
+{error_section}
+========================
+
+This is an automated execution log from your Gmail Agent running on Google Cloud Run.
+"""
+            
+            message = MIMEText(body)
+            message['to'] = to
+            message['subject'] = f"Gmail Agent Log - {status} - {execution_time}"
+            raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            body_data = {'raw': raw}
+            
+            result = self.service.users().messages().send(userId='me', body=body_data).execute()
+            print(f'Execution log sent. Message Id: {result["id"]}')
+            return result
+        except HttpError as error:
+            print(f'An error occurred sending execution log: {error}')
+            return None
 

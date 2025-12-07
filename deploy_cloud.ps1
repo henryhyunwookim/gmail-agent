@@ -27,7 +27,7 @@ $PROJECT_ID = $GCP_PROJECT_ID
 $REGION = if ($GCP_REGION) { $GCP_REGION } else { "us-central1" }
 $SERVICE_NAME = if ($SERVICE_NAME) { $SERVICE_NAME } else { "gmail-agent" }
 $JOB_NAME = if ($JOB_NAME) { $JOB_NAME } else { "gmail-agent-daily-trigger" }
-$SCHEDULE = if ($SCHEDULE) { $SCHEDULE } else { "0 5 * * *" }  # Run at 5:00 AM every day
+$SCHEDULE = if ($SCHEDULE) { $SCHEDULE } else { "0 5,17 * * *" }  # Run at 5:00 AM and 5:00 PM every day
 $TIMEZONE = if ($TIMEZONE) { $TIMEZONE } else { "Asia/Seoul" }  # Set to your timezone
 
 Write-Host "Deploying Gmail Agent to Google Cloud..." -ForegroundColor Green
@@ -98,4 +98,4 @@ else {
 }
 
 Write-Host "Deployment Complete!" -ForegroundColor Green
-Write-Host "Your agent will run daily at 5:00 AM ($TIMEZONE)."
+Write-Host "Your agent will run twice daily at 5:00 AM and 5:00 PM ($TIMEZONE)."
