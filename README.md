@@ -22,27 +22,30 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 Here's how an incoming email looks when processed by the agent:
 
 **Original Email:**
-> **From:** Sarah Jones (via Project Alpha Updates)
-> **Subject:** Project Alpha Update & Q4 Planning
-> **Body:** Hi everyone, quick update on Project Alpha. The backend API is finally complete and all tests are passing! However, we're hitting some snags with the frontend integration—specifically around the new auth flow. We likely need another 2 days to iron that out. Also, we really need to lock down the Q4 roadmap. Can we meet next Tuesday at 2 PM to go over the proposed features? Let me know if that works.
+> **From:** Sarah Jones (via Project Alpha Updates) <<sarah.jones@example.com>><br>
+> **Subject:** Project Alpha Update & Q4 Planning<br>
+> **Body:** Hi everyone, quick update on Project Alpha. The backend API is finally complete and all tests are passing! However, we're hitting some snags with the frontend integration—specifically around the new auth flow. We likely need another 2 days to iron that out. Also, we really need to lock down the Q4 roadmap. Can we meet next Tuesday at 2 PM to go over the proposed features? Let me know if that works.<br>
 >
 > [You are receiving this because you are subscribed to Project Alpha Updates. Unsubscribe]
 
 **Agent's Summary Email:**
-> **Subject:** Summary: Project Alpha Update & Q4 Planning
+> **Original Sender:** Sarah Jones (via Project Alpha Updates) <<sarah.jones@example.com>><br>
+> **Subject:** Project Alpha Update & Q4 Planning
 >
-> 📝 **Summary**
+> **Summary:**<br>
 > Sarah reports that the Project Alpha backend is complete, but frontend integration is delayed by ~2 days due to auth issues. She requests a Q4 planning meeting next Tuesday at 2 PM.
 >
-> 🔍 **Key Insights**
-> - **Backend Status**: API implementation is complete with passing tests.
-> - **Frontend Issues**: Delays caused by authentication flow integration.
-> - **Scheduling**: Requests meeting on Tuesday @ 2 PM for Q4 roadmap.
+> **Insights**<br>
+> ・Backend Status: API implementation is complete with passing tests.<br>
+> ・Frontend Issues: Delays caused by authentication flow integration.<br>
+> ・Scheduling: Requests meeting on Tuesday @ 2 PM for Q4 roadmap.<br>
 >
-> ⚡ **Action Required**: Yes
+> **Action Required**: YES<br>
 > **Reason**: Needs confirmation for the proposed meeting time.
 >
-> 🛑 **Unsubscribe Link**: [Link found in email]
+> **Unsubscribe Link**: [Link found in email]
+
+As you can imagine, insights can be a lot more helpful for longer emails.
 
 ## Prerequisites
 
