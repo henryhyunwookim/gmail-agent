@@ -17,6 +17,33 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 - ☁️ **Cloud Deployment**: Runs on Google Cloud Run (Free Tier eligible)
 - ⏰ **Scheduled Execution**: Automatically processes emails twice daily at 5:00 AM and 5:00 PM
 
+## Example Output
+
+Here's how an incoming email looks when processed by the agent:
+
+**Original Email:**
+> **From:** Sarah Jones (via Project Alpha Updates)
+> **Subject:** Project Alpha Update & Q4 Planning
+> **Body:** Hi everyone, quick update on Project Alpha. The backend API is finally complete and all tests are passing! However, we're hitting some snags with the frontend integration—specifically around the new auth flow. We likely need another 2 days to iron that out. Also, we really need to lock down the Q4 roadmap. Can we meet next Tuesday at 2 PM to go over the proposed features? Let me know if that works.
+>
+> [You are receiving this because you are subscribed to Project Alpha Updates. Unsubscribe]
+
+**Agent's Summary Email:**
+> **Subject:** Summary: Project Alpha Update & Q4 Planning
+>
+> 📝 **Summary**
+> Sarah reports that the Project Alpha backend is complete, but frontend integration is delayed by ~2 days due to auth issues. She requests a Q4 planning meeting next Tuesday at 2 PM.
+>
+> 🔍 **Key Insights**
+> - **Backend Status**: API implementation is complete with passing tests.
+> - **Frontend Issues**: Delays caused by authentication flow integration.
+> - **Scheduling**: Requests meeting on Tuesday @ 2 PM for Q4 roadmap.
+>
+> ⚡ **Action Required**: Yes
+> **Reason**: Needs confirmation for the proposed meeting time.
+>
+> 🛑 **Unsubscribe Link**: [Link found in email]
+
 ## Prerequisites
 
 - Python 3.11+
@@ -168,13 +195,19 @@ purchase_keywords = [
 gmail-agent/
 ├── src/
 │   ├── app.py              # Flask web server for Cloud Run
-│   ├── main.py             # Main application logic
 │   ├── auth.py             # Gmail authentication
+│   ├── debug_run.py        # Debugging utility
 │   ├── gmail_client.py     # Gmail API client
+│   ├── list_models.py      # Utility to list available Gemini models
+│   ├── main.py             # Main application logic
 │   └── summarizer.py       # AI summarization logic
+├── DEPLOYMENT.md           # Detailed deployment guide
 ├── Dockerfile              # Container configuration
+├── LICENSE                 # Project license
+├── README.md               # Project documentation
 ├── deploy_cloud.ps1        # Cloud deployment script
 ├── requirements.txt        # Python dependencies
+├── run_agent.bat           # Windows executable helper
 ├── credentials.json        # Gmail OAuth credentials (not in repo)
 ├── token.json             # Gmail auth token (not in repo)
 └── .env                   # Environment variables (not in repo)

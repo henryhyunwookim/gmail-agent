@@ -40,3 +40,6 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Promo
+promo_materials/
