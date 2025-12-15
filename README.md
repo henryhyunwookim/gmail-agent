@@ -115,7 +115,7 @@ GCP_PROJECT_ID=your-gcp-project-id
 GCP_REGION=us-central1
 SERVICE_NAME=gmail-agent
 JOB_NAME=gmail-agent-daily-trigger
-SCHEDULE=0 2 * * *
+SCHEDULE=0 5,17 * * *
 TIMEZONE=Asia/Seoul
 ```
 
@@ -195,7 +195,7 @@ messages = client.list_unread_messages(max_results=50)  # Change this number
 Edit `deploy_cloud.ps1`:
 
 ```powershell
-$SCHEDULE = "0 5 * * *"  # Cron format: daily at 5:00 AM
+$SCHEDULE = "0 5,17 * * *"  # Cron format: daily at 5:00 AM and 5:00 PM
 $TIMEZONE = "Asia/Seoul"  # Your timezone
 ```
 
