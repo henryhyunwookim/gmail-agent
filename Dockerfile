@@ -1,5 +1,9 @@
 FROM python:3.11-slim
 
+# Ensure logs are streamed to Cloud Logging
+ENV PYTHONUNBUFFERED=1
+
+
 WORKDIR /app
 
 # Install system dependencies if needed (e.g. for some python packages)

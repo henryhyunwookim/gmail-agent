@@ -54,7 +54,25 @@ As you can imagine, insights can be a lot more helpful for longer emails.
 - Gmail account
 - Google Cloud Project with billing enabled
 
+## Prerequisites
+
+1.  **Google Cloud Project**: You need a Google Cloud Project.
+2.  **Gmail API Enabled**: Enable the Gmail API for your project.
+3.  **OAuth Consent Screen**:
+    -   Go to [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent).
+    -   Set "User Type" to **External**.
+    -   Fill in required fields (App name, support email).
+    -   **IMPORTANT**: Under "Publishing status", click **"Publish App"** to set it to "In production". This prevents the authentication token from expiring every 7 days.
+4.  **Credentials**:
+    -   Go to [Credentials](https://console.cloud.google.com/apis/credentials).
+    -   Click "Create Credentials" > "OAuth client ID".
+    -   Application type: **Desktop app**.
+    -   Name: "Gmail Agent Desktop".
+    -   Click "Create" and download the JSON file.
+    -   Rename it to `credentials.json` and place it in the project root.
+
 ## Setup
+
 
 ### 1. Clone the Repository
 
