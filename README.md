@@ -17,6 +17,70 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 - ☁️ **Cloud Deployment**: Runs on Google Cloud Run (Free Tier eligible)
 - ⏰ **Scheduled Execution**: Automatically processes emails twice daily at 5:00 AM and 5:00 PM
 
+## Architecture
+
+The system is designed as a cloud-native application running on **Google Cloud Platform (GCP)**, leveraging **Google Gemini 2.0 Flash** for high-speed, cost-effective AI analysis.
+
+```mermaid
+graph TD
+    subgraph Google Cloud Platform
+        Scheduler[Cloud Scheduler] -->|Trigger 5AM/5PM| CloudRun[Cloud Run Service]
+        CloudRun -->|Runs| App[Flask App]
+        App -->|Executes| Main[Main Logic]
+    end
+
+    subgraph External Services
+        GmailAPI[Gmail API]
+        GeminiAPI[Google Gemini API]
+    end
+
+    subgraph Application Logic
+        Main -->|Auth & Fetch| GmailClient[Gmail Client]
+        Main -->|Analyze| Summarizer[AI Summarizer]
+        
+        %% Data Flow
+        GmailClient -.->|Email Content| Summarizer
+        Summarizer -.->|Summary & Actions| GmailClient
+
+        Summarizer -->|Generate Content| GeminiAPI
+        GmailClient -->|Read Emails| GmailAPI
+        GmailClient -->|Send Summaries| GmailAPI
+        GmailClient -->|Apply Labels| GmailAPI
+    end
+
+    GmailAPI -->|Delivers Summary| User((User))
+```
+
+### System Components
+
+*   **Cloud Scheduler**: The "alarm clock" that triggers the system twice daily (5:00 AM/PM).
+*   **Cloud Run**: The serverless compute environment that hosts and executes the agent container.
+*   **Gmail Client**: The internal Python module that handles authentication, fetches emails, and constructs the summary emails.
+*   **AI Summarizer**: The intelligence layer that prepares prompts for Gemini and interprets the structured JSON response.
+*   **Gmail API**: Google's external service that stores your emails and physically delivers the summaries to your inbox.
+*   **Gemini API**: Google's LLM service (Gemini 2.0 Flash) that performs the text analysis and summarization.
+
+### Logic Flow
+
+The application follows a linear execution pipeline, optimized for batch processing:
+
+1.  **Trigger & Auth**: The Cloud Scheduler triggers the container. The app authenticates with Gmail using OAuth 2.0.
+2.  **Fetch**: Retrieves the last 50 unread emails from the inbox.
+3.  **Smart Filtering**:
+    *   **Self-Sent**: Ignores emails sent by the user to avoid loops.
+    *   **Redundancy Check**: Skips threads that have already been summarized by the agent (checks for "Fwd:" from user).
+    *   **Transactional**: Detects and skips purchase receipts, shipping notifications, and invoices (e.g., from Amazon, PayPal) to focus on communication.
+4.  **AI Analysis**:
+    *   The **EmailSummarizer** sends the email body to **Gemini 2.0 Flash**.
+    *   Gemini generates a structured JSON response containing:
+        *   Concise summary.
+        *   Key insights/facts.
+        *   Action required status (True/False) & reason.
+5.  **Action & Notification**:
+    *   **Forward**: The agent forwards the original email to the user, prepending the AI summary and insights.
+    *   **Label**: Applies `ActionRequired` or `ReadLater` labels to the original message for easy sorting.
+6.  **Reporting**: A final execution log is sent to the user, detailing processing stats and any errors.
+
 ## Example Output
 
 Here's how an incoming email looks when processed by the agent:
