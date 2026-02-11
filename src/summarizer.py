@@ -94,40 +94,66 @@ Rules:
 - Output ONLY the JSON object, nothing else
 """
         
-        try:
-            response = self.model.generate_content(prompt)
-            text = response.text.strip()
-            
-            # Clean up markdown code blocks
-            if '```json' in text:
-                text = text.split('```json')[1].split('```')[0].strip()
-            elif '```' in text:
-                text = text.split('```')[1].split('```')[0].strip()
-            
-            # Try to parse JSON
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
             try:
-                result = json.loads(text)
-                result['unsubscribe_link'] = unsubscribe_link
-                return result
-            except json.JSONDecodeError:
-                # If JSON parsing fails, try to extract JSON from the text
-                import re
-                json_match = re.search(r'\{[^{}]*"summary"[^{}]*"action_required"[^{}]*"reason"[^{}]*\}', text, re.DOTALL)
-                if json_match:
-                    result = json.loads(json_match.group(0))
+                response = self.model.generate_content(prompt)
+                text = response.text.strip()
+                
+                # Attempt to extract JSON
+                extracted_json = text
+                
+                # 1. Try finding json code blocks
+                if '```json' in text:
+                    extracted_json = text.split('```json')[1].split('```')[0].strip()
+                elif '```' in text:
+                    extracted_json = text.split('```')[1].split('```')[0].strip()
+                
+                # 2. Try parsing
+                try:
+                    result = json.loads(extracted_json)
                     result['unsubscribe_link'] = unsubscribe_link
                     return result
-                else:
-                    raise ValueError("Could not extract valid JSON from response")
+                except json.JSONDecodeError:
+                    # 3. Fallback: regex search for JSON object
+                    import re
+                    # Look for { ... } structure, non-greedy
+                    json_match = re.search(r'(\{[\s\S]*\})', text)
+                    if json_match:
+                        try:
+                            result = json.loads(json_match.group(1))
+                            result['unsubscribe_link'] = unsubscribe_link
+                            return result
+                        except json.JSONDecodeError:
+                            pass # Continue to raise error or retry
                     
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            print(f"Error summarizing email: {e}")
-            print(f"Raw response: {response.text if 'response' in locals() else 'No response'}")
-            return {
-                "summary": "Error summarizing email.",
-                "action_required": False,
-                "reason": "AI processing failed.",
-                "unsubscribe_link": unsubscribe_link
-            }
+                    # If we are here, parsing failed.
+                    # If this was the last attempt, raise the error to be caught below
+                    if attempt == max_retries - 1:
+                        raise ValueError(f"Could not parse JSON from response: {text[:100]}...")
+                    else:
+                        print(f"JSON parsing failed on attempt {attempt+1}. Retrying...")
+                        continue
+
+            except Exception as e:
+                import traceback
+                import time
+                
+                print(f"Attempt {attempt+1} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                else:
+                    traceback.print_exc()
+                    print(f"Error summarizing email after {max_retries} attempts: {e}")
+                    
+                    # Capture specific error message
+                    error_reason = f"AI processing failed: {str(e)}"
+                    
+                    return {
+                        "summary": "Error summarizing email.",
+                        "action_required": False,
+                        "reason": error_reason,
+                        "unsubscribe_link": unsubscribe_link
+                    }
