@@ -6,6 +6,11 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 - 🤖 **AI-Powered Summarization**: Uses Gemini 2.0 Flash to create concise email summaries
 - 💡 **Section-Based Insights**: Breaks down emails into logical sections with topics and key insights
+- 📚 **Chinese Study Corner**: Automatically detects emails from FTChinese and generates:
+  - Original Chinese text segments
+  - Pinyin with tone marks
+  - Word-by-word vocabulary breakdowns
+  - Segment-specific English translations
 - 🎯 **Action Detection**: Automatically identifies emails requiring your attention
 - 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ReadLater`) based on email analysis
 - 🧵 **Thread Continuity**: Summaries appear in the original email thread
@@ -78,6 +83,7 @@ The application follows a linear execution pipeline, optimized for batch process
         *   Action required status (True/False) & reason.
 5.  **Action & Notification**:
     *   **Forward**: The agent forwards the original email to the user, prepending the AI summary and insights.
+    *   **Chinese Study Corner**: If the email is from `newsletter.ftchinese.com`, a special study section is appended with original text, pinyin, English, and vocabulary.
     *   **Label**: Applies `ActionRequired` or `ReadLater` labels to the original message for easy sorting.
 6.  **Reporting**: A final execution log is sent to the user, detailing processing stats and any errors.
 
