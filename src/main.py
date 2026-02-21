@@ -86,8 +86,11 @@ def main():
                 print(f"From: {content['sender']}")
 
                 
+                # Check if this email is from FTChinese
+                is_ftchinese = sender_email.lower().endswith("newsletter.ftchinese.com")
+                
                 # Summarize
-                analysis = summarizer.summarize(content)
+                analysis = summarizer.summarize(content, include_translation=is_ftchinese)
                 print(f"Summary: {analysis['summary']}")
                 print(f"Action Required: {analysis['action_required']}")
                 
@@ -105,6 +108,23 @@ def main():
                         insight = section.get('insight', 'No insight provided')
                         insights_section += f"• {topic}: {insight}\n"
                 
+                # Format translation section for FTChinese
+                translation_section = ""
+                if is_ftchinese and analysis.get('learning_segments'):
+                    translation_section = "\n\n=== CHINESE STUDY CORNER ===\n"
+                    for i, segment in enumerate(analysis['learning_segments'], 1):
+                        translation_section += f"\n[Segment {i}]\n"
+                        translation_section += f"Original: {segment.get('original', '')}\n\n"
+                        translation_section += f"Pinyin:   {segment.get('pinyin', '')}\n\n"
+                        translation_section += f"English:  {segment.get('translation', '')}\n\n"
+                        
+                        if segment.get('vocabulary'):
+                            translation_section += "Vocabulary:\n"
+                            for vocab in segment['vocabulary']:
+                                translation_section += f"  • {vocab.get('word')}: {vocab.get('pinyin')} - {vocab.get('english')}\n"
+                            translation_section += "\n"
+                    translation_section += "\n=============================\n"
+
                 summary_text = f"""
 === EMAIL SUMMARY ===
 
@@ -112,7 +132,7 @@ Original Sender: {content['sender']}
 Subject: {content['subject']}
 
 Summary:
-{analysis['summary']}{insights_section}
+{analysis['summary']}{insights_section}{translation_section}
 Action Required: {'YES' if analysis['action_required'] else 'NO'}
 Reason: {analysis['reason']}{unsubscribe_section}
 ========================

@@ -60,11 +60,23 @@ class EmailSummarizer:
         # Filter if: (2+ keywords) OR (commerce sender + 1+ keyword)
         return keyword_count >= 2 or (is_commerce_sender and keyword_count >= 1)
 
-    def summarize(self, email_content):
+    def summarize(self, email_content, include_translation=False):
         """Summarizes the email and determines if action is required."""
         # Extract unsubscribe link
         unsubscribe_link = self.extract_unsubscribe_link(email_content['body'])
         
+        translation_instructions = ""
+        if include_translation:
+            translation_instructions = """
+- Since this is a Chinese email for learning purposes, you MUST provide a "learning_segments" list. 
+- Break the email body into 3-5 logical segments (paragraphs or groups of related sentences).
+- For each segment, provide:
+    - "original": The original Chinese text.
+    - "pinyin": The pinyin for the segment with tone marks.
+    - "vocabulary": A list of key words/phrases in that segment, e.g., [{"word": "...", "pinyin": "...", "english": "..."}].
+    - "translation": The English translation of that specific segment.
+"""
+
         prompt = f"""You are an intelligent email assistant. Analyze the following email and provide a structured response.
 
 Email Subject: {email_content['subject']}
@@ -82,15 +94,14 @@ IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additi
         }}
     ],
     "action_required": true,
-    "reason": "Brief explanation of why action is or isn't required"
+    "reason": "Brief explanation of why action is or isn't required"{', "learning_segments": [{"original": "...", "pinyin": "...", "vocabulary": [{"word": "...", "pinyin": "...", "english": "..."}], "translation": "..."}]' if include_translation else ''}
 }}
 
 Rules:
 - summary: Concise overall summary of the email (1-2 sentences)
-- sections: Break down the email into logical sections. For short emails, create 1 section. For longer emails with multiple topics, create multiple sections (2-5 sections)
-- Each section must have a "topic" (the subject/theme) and an "insight" (the key information or takeaway)
+- sections: Break down the email into logical sections.
 - action_required: true if the email requires a response or action from the recipient, false otherwise
-- reason: Brief explanation (one sentence)
+- reason: Brief explanation (one sentence){translation_instructions}
 - Output ONLY the JSON object, nothing else
 """
         
