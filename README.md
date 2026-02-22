@@ -6,21 +6,11 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 - 🤖 **AI-Powered Summarization**: Uses Gemini 2.5 Flash to create concise email summaries
 - 💡 **Section-Based Insights**: Breaks down emails into logical sections with topics and key insights
-- 📚 **Chinese Study Corner**: Automatically detects emails from FTChinese and generates:
-  - Original Chinese text segments
-  - Pinyin with tone marks
-  - Word-by-word vocabulary breakdowns
-  - Segment-specific English translations
+- 📚 **Chinese Study Corner**: Automatically detects emails from FTChinese and generates original text, pinyin, and vocabulary
 - 🎯 **Action Detection**: Automatically identifies emails requiring your attention
-- 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ReadLater`) based on email analysis
-- 🧵 **Thread Continuity**: Summaries appear in the original email thread
-- 🔍 **Smart Filtering**:
-  - Skips self-sent emails
-  - Filters out purchase/transactional emails (Amazon, PayPal, etc.)
-  - Prevents duplicate summaries in threads
-- 🔗 **Unsubscribe Detection**: Automatically extracts and includes unsubscribe links in summaries
+- 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ReadLater`)
 - ☁️ **Cloud Deployment**: Runs on Google Cloud Run (Free Tier eligible)
-- ⏰ **Scheduled Execution**: Automatically processes emails twice daily at 5:00 AM and 5:00 PM
+
 
 ## Architecture
 
@@ -117,14 +107,27 @@ Here's how an incoming email looks when processed by the agent:
 
 As you can imagine, insights can be a lot more helpful for longer emails.
 
+## 🎨 Personalization Showcase
+
+This agent is highly customizable. While it includes built-in support for **Chinese language learning**, the same logic can be applied to any specialized newsletter, technical digest, or specific communication style.
+
+### ✨ Example: Custom Study Materials
+The agent can be configured to extract content from specific newsletters and transform them into personalized study or reference materials.
+
+![Personalization Infographic](notebookLM/infographic.png)
+
+### 📺 Video Walkthrough
+Watch how the agent helps in "Taming Your Inbox" and can be tailored for specialized content:
+[**Watch the Personalization Video**](notebookLM/Taming_Your_Inbox.mp4)
+
+---
+
 ## Prerequisites
 
 - Python 3.11+
 - Google Cloud account (for deployment)
 - Gmail account
 - Google Cloud Project with billing enabled
-
-## Prerequisites
 
 1.  **Google Cloud Project**: You need a Google Cloud Project.
 2.  **Gmail API Enabled**: Enable the Gmail API for your project.
@@ -284,6 +287,11 @@ purchase_keywords = [
 
 ```
 gmail-agent/
+├── deployment/
+│   ├── .env.example        # Template for environment variables
+│   ├── DEPLOYMENT.md       # Detailed deployment guide
+│   └── deploy_cloud.ps1    # Cloud deployment script
+├── notebookLM/             # Personalization assets (infographic, video)
 ├── src/
 │   ├── app.py              # Flask web server for Cloud Run
 │   ├── auth.py             # Gmail authentication
@@ -292,16 +300,14 @@ gmail-agent/
 │   ├── list_models.py      # Utility to list available Gemini models
 │   ├── main.py             # Main application logic
 │   └── summarizer.py       # AI summarization logic
-├── DEPLOYMENT.md           # Detailed deployment guide
 ├── Dockerfile              # Container configuration
 ├── LICENSE                 # Project license
 ├── README.md               # Project documentation
-├── deploy_cloud.ps1        # Cloud deployment script
 ├── requirements.txt        # Python dependencies
 ├── run_agent.bat           # Windows executable helper
 ├── credentials.json        # Gmail OAuth credentials (not in repo)
-├── token.json             # Gmail auth token (not in repo)
-└── .env                   # Environment variables (not in repo)
+├── token.json              # Gmail auth token (not in repo)
+└── .env                    # Environment variables (not in repo)
 ```
 
 ## Cost Estimate
