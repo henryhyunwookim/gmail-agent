@@ -4,7 +4,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 ## Features
 
-- 🤖 **AI-Powered Summarization**: Uses Gemini 2.0 Flash to create concise email summaries
+- 🤖 **AI-Powered Summarization**: Uses Gemini 2.5 Flash to create concise email summaries
 - 💡 **Section-Based Insights**: Breaks down emails into logical sections with topics and key insights
 - 📚 **Chinese Study Corner**: Automatically detects emails from FTChinese and generates:
   - Original Chinese text segments
@@ -24,7 +24,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 ## Architecture
 
-The system is designed as a cloud-native application running on **Google Cloud Platform (GCP)**, leveraging **Google Gemini 2.0 Flash** for high-speed, cost-effective AI analysis.
+The system is designed as a cloud-native application running on **Google Cloud Platform (GCP)**, leveraging **Google Gemini 2.5 Flash** for high-speed, cost-effective AI analysis.
 
 ```mermaid
 graph TD
@@ -63,7 +63,7 @@ graph TD
 *   **Gmail Client**: The internal Python module that handles authentication, fetches emails, and constructs the summary emails.
 *   **AI Summarizer**: The intelligence layer that prepares prompts for Gemini and interprets the structured JSON response.
 *   **Gmail API**: Google's external service that stores your emails and physically delivers the summaries to your inbox.
-*   **Gemini API**: Google's LLM service (Gemini 2.0 Flash) that performs the text analysis and summarization.
+*   **Gemini API**: Google's LLM service (Gemini 2.5 Flash) that performs the text analysis and summarization.
 
 ### Logic Flow
 
@@ -76,7 +76,7 @@ The application follows a linear execution pipeline, optimized for batch process
     *   **Redundancy Check**: Skips threads that have already been summarized by the agent (checks for "Fwd:" from user).
     *   **Transactional**: Detects and skips purchase receipts, shipping notifications, and invoices (e.g., from Amazon, PayPal) to focus on communication.
 4.  **AI Analysis**:
-    *   The **EmailSummarizer** sends the email body to **Gemini 2.0 Flash**.
+    *   The **EmailSummarizer** sends the email body to **Gemini 2.5 Flash**.
     *   Gemini generates a structured JSON response containing:
         *   Concise summary.
         *   Key insights/facts.
