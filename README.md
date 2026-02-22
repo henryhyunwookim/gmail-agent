@@ -9,6 +9,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 - 📚 **Chinese Study Corner**: Automatically detects emails from FTChinese and generates original text, pinyin, and vocabulary
 - 🎯 **Action Detection**: Automatically identifies emails requiring your attention
 - 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ReadLater`)
+- 🔗 **Unsubscribe Detection**: Automatically extracts unsubscribe/opt-out links for easy access
 - ☁️ **Cloud Deployment**: Runs on Google Cloud Run (Free Tier eligible)
 
 
@@ -73,6 +74,7 @@ The application follows a linear execution pipeline, optimized for batch process
         *   Action required status (True/False) & reason.
 5.  **Action & Notification**:
     *   **Forward**: The agent forwards the original email to the user, prepending the AI summary and insights.
+    *   **Unsubscribe Link**: If detected, the agent extracts the `unsubscribe`, `opt-out`, or `preferences` link and appends it to the summary for quick management.
     *   **Chinese Study Corner**: If the email is from `newsletter.ftchinese.com`, a special study section is appended with original text, pinyin, English, and vocabulary.
     *   **Label**: Applies `ActionRequired` or `ReadLater` labels to the original message for easy sorting.
 6.  **Reporting**: A final execution log is sent to the user, detailing processing stats and any errors.
