@@ -105,7 +105,7 @@ Rules:
 - Output ONLY the JSON object, nothing else
 """
         
-        max_retries = 3
+        max_retries = 5
         retry_delay = 2
         
         for attempt in range(max_retries):
@@ -152,9 +152,15 @@ Rules:
                 import traceback
                 import time
                 
-                print(f"Attempt {attempt+1} failed: {e}")
+                error_msg = str(e)
+                print(f"Attempt {attempt+1} failed: {error_msg}")
                 if attempt < max_retries - 1:
-                    time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                    # Handle Vertex AI 429 Rate Limit (Resource exhausted)
+                    if "429" in error_msg or "Resource exhausted" in error_msg:
+                        print("Rate limit reached. Waiting 60 seconds before retrying...")
+                        time.sleep(60)
+                    else:
+                        time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
                 else:
                     traceback.print_exc()
                     print(f"Error summarizing email after {max_retries} attempts: {e}")

@@ -71,6 +71,9 @@ def main():
                 if '<' in sender_email:
                     sender_email = sender_email.split('<')[1].split('>')[0]
                 
+                # Strip any stray brackets or spaces that might remain
+                sender_email = sender_email.strip('<> ')
+                
                 if user_email.lower() in sender_email.lower():
                     stats['self_sent'] += 1
                     print(f"Skipping email from self: {sender_email}")
