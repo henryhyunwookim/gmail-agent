@@ -10,8 +10,46 @@ class EmailSummarizer:
     def extract_unsubscribe_link(self, email_body):
         """Extracts unsubscribe link from email body if present."""
         import re
+        from bs4 import BeautifulSoup
         
-        # Common unsubscribe link patterns
+        # Multilingual unsubscribe keywords (lowercased)
+        keywords = [
+            'unsubscribe', 'optout', 'opt-out', 'remove', 'preferences',
+            '退订', '取消订阅',  # Chinese
+            'darse de baja', 'cancelar suscripción', # Spanish
+            'se désabonner', 'désinscription', # French
+            'abmelden', # German
+            '配信停止', '退会', # Japanese
+            '수신거부', '구독취소', # Korean
+            'annulla iscrizione', 'cancellati', # Italian
+            'cancelar subscrição', 'remover', # Portuguese
+            'отписаться', # Russian
+        ]
+        
+        link = None
+        
+        # 1. Try parsing as HTML with BeautifulSoup to find anchor tags
+        if '<html' in email_body.lower() or '<body' in email_body.lower() or '<a ' in email_body.lower():
+            soup = BeautifulSoup(email_body, 'html.parser')
+            for a_tag in soup.find_all('a', href=True):
+                text = a_tag.get_text().strip().lower()
+                href = a_tag['href'].lower()
+                
+                # Check if anchor text contains any keyword
+                if any(kw in text for kw in keywords):
+                    link = a_tag['href']
+                    break
+                    
+                # Check if href contains English-like keywords for URL matching
+                english_kws = ['unsubscribe', 'optout', 'opt-out', 'remove']
+                if any(kw in href for kw in english_kws):
+                    link = a_tag['href']
+                    break
+        
+        if link:
+            return link
+
+        # 2. Fallback to regex for plain text or generic URL extraction
         patterns = [
             r'https?://[^\s<>"]+?unsubscribe[^\s<>"]*',
             r'https?://[^\s<>"]+?optout[^\s<>"]*',
