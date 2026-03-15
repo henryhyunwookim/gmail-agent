@@ -103,43 +103,64 @@ class EmailSummarizer:
         # Extract unsubscribe link
         unsubscribe_link = self.extract_unsubscribe_link(email_content['body'])
         
-        translation_instructions = ""
         if include_translation:
-            translation_instructions = """
-- Since this is a Chinese email for learning purposes, you MUST provide a "learning_segments" list. 
-- Break the email body into 3-5 logical segments (paragraphs or groups of related sentences).
-- For each segment, provide:
-    - "original": The original Chinese text.
-    - "pinyin": The pinyin for the segment with tone marks.
-    - "vocabulary": A list of key words/phrases in that segment, e.g., [{"word": "...", "pinyin": "...", "english": "..."}].
-    - "translation": The English translation of that specific segment.
-"""
+            prompt = f"""You are an intelligent email assistant specialized in Chinese language learning. Analyze the following FTChinese email and provide a structured learning breakdown.
 
-        prompt = f"""You are an intelligent email assistant. Analyze the following email and provide a structured response.
-
-Email Subject: {email_content['subject']}
-Email Sender: {email_content['sender']}
+Email Subject: {{email_content['subject']}}
+Email Sender: {{email_content['sender']}}
 Email Body:
-{email_content['body'][:4000]}
+{{email_content['body'][:4000]}}
 
 IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additional text):
-{{
+{{{{
+    "action_required": true,
+    "reason": "Brief explanation of why action is or isn't required",
+    "learning_segments": [
+        {{{{
+            "original": "...",
+            "pinyin": "...",
+            "vocabulary": [
+                {{"word": "...", "pinyin": "...", "english": "..."}}
+            ],
+            "translation": "..."
+        }}}}
+    ]
+}}}}
+
+Rules:
+- action_required: true if the email requires a response or action from the recipient, false otherwise
+- reason: Brief explanation (one sentence)
+- learning_segments: Break the email body down **sentence by sentence**. Each segment should represent exactly one distinct sentence of the article content.
+- EXCLUDE any promotional content, advertisements, newsletter subscription reminders, or FTChinese membership benefits from the learning_segments. Focus ONLY on the actual article or main content.
+- For each sentence in learning_segments, you MUST provide the original Chinese text, the pinyin with tone marks, a list of up to 3 key vocabulary words, and the English translation.
+- Output ONLY the JSON object, nothing else
+"""
+        else:
+            prompt = f"""You are an intelligent email assistant. Analyze the following email and provide a structured response.
+
+Email Subject: {{email_content['subject']}}
+Email Sender: {{email_content['sender']}}
+Email Body:
+{{email_content['body'][:4000]}}
+
+IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additional text):
+{{{{
     "summary": "A concise 1-2 sentence overall summary of the email",
     "sections": [
-        {{
+        {{{{
             "topic": "Topic or theme of this section",
             "insight": "Key insight, information, or takeaway from this section"
-        }}
+        }}}}
     ],
     "action_required": true,
-    "reason": "Brief explanation of why action is or isn't required"{', "learning_segments": [{"original": "...", "pinyin": "...", "vocabulary": [{"word": "...", "pinyin": "...", "english": "..."}], "translation": "..."}]' if include_translation else ''}
-}}
+    "reason": "Brief explanation of why action is or isn't required"
+}}}}
 
 Rules:
 - summary: Concise overall summary of the email (1-2 sentences)
 - sections: Break down the email into logical sections.
 - action_required: true if the email requires a response or action from the recipient, false otherwise
-- reason: Brief explanation (one sentence){translation_instructions}
+- reason: Brief explanation (one sentence)
 - Output ONLY the JSON object, nothing else
 """
         

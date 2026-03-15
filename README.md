@@ -75,7 +75,7 @@ The application follows a linear execution pipeline, optimized for batch process
 5.  **Action & Notification**:
     *   **Forward**: The agent forwards the original email to the user, prepending the AI summary and insights.
     *   **Unsubscribe Link**: If detected, the agent extracts the `unsubscribe`, `opt-out`, or `preferences` link and appends it to the summary for quick management.
-    *   **Chinese Study Corner**: If the email is from `newsletter.ftchinese.com`, a special study section is appended with original text, pinyin, English, and vocabulary.
+    *   **Chinese Study Corner**: If the email is from `newsletter.ftchinese.com`, a special study section is appended with original text, pinyin, English, and vocabulary. The general summary and insights are excluded to save API resources and avoid duplicate content.
     *   **Label**: Applies `ActionRequired` or `ReadLater` labels to the original message for easy sorting.
 6.  **Reporting**: A final execution log is sent to the user, detailing processing stats and any errors.
 

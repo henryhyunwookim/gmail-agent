@@ -94,8 +94,11 @@ def main():
                 
                 # Summarize
                 analysis = summarizer.summarize(content, include_translation=is_ftchinese)
-                print(f"Summary: {analysis['summary']}")
-                print(f"Action Required: {analysis['action_required']}")
+                if is_ftchinese:
+                    print(f"Action Required: {analysis.get('action_required', False)}")
+                else:
+                    print(f"Summary: {analysis.get('summary', 'No summary provided')}")
+                    print(f"Action Required: {analysis.get('action_required', False)}")
                 
                 # Construct summary text for forwarding
                 unsubscribe_section = ""
@@ -104,7 +107,7 @@ def main():
                 
                 # Format insights section
                 insights_section = ""
-                if analysis.get('sections') and len(analysis['sections']) > 0:
+                if not is_ftchinese and analysis.get('sections') and len(analysis['sections']) > 0:
                     insights_section = "\n\nInsights:\n"
                     for section in analysis['sections']:
                         topic = section.get('topic', 'Unknown')
@@ -116,7 +119,7 @@ def main():
                 if is_ftchinese and analysis.get('learning_segments'):
                     translation_section = "\n\n=== CHINESE STUDY CORNER ===\n"
                     for i, segment in enumerate(analysis['learning_segments'], 1):
-                        translation_section += f"\n[Segment {i}]\n"
+                        translation_section += f"\n[Sentence {i}]\n"
                         translation_section += f"Original: {segment.get('original', '')}\n\n"
                         translation_section += f"Pinyin:   {segment.get('pinyin', '')}\n\n"
                         translation_section += f"English:  {segment.get('translation', '')}\n\n"
@@ -124,20 +127,31 @@ def main():
                         if segment.get('vocabulary'):
                             translation_section += "Vocabulary:\n"
                             for vocab in segment['vocabulary']:
-                                translation_section += f"  • {vocab.get('word')}: {vocab.get('pinyin')} - {vocab.get('english')}\n"
+                                translation_section += f"  • {vocab.get('word', '')}: {vocab.get('pinyin', '')} - {vocab.get('english', '')}\n"
                             translation_section += "\n"
                     translation_section += "\n=============================\n"
 
-                summary_text = f"""
+                if is_ftchinese:
+                    summary_text = f"""
+=== EMAIL SUMMARY ===
+
+Original Sender: {content['sender']}
+Subject: {content['subject']}{translation_section}
+Action Required: {'YES' if analysis.get('action_required', False) else 'NO'}
+Reason: {analysis.get('reason', 'None')}{unsubscribe_section}
+========================
+"""
+                else:
+                    summary_text = f"""
 === EMAIL SUMMARY ===
 
 Original Sender: {content['sender']}
 Subject: {content['subject']}
 
 Summary:
-{analysis['summary']}{insights_section}{translation_section}
-Action Required: {'YES' if analysis['action_required'] else 'NO'}
-Reason: {analysis['reason']}{unsubscribe_section}
+{analysis.get('summary', 'No summary provided')}{insights_section}
+Action Required: {'YES' if analysis.get('action_required', False) else 'NO'}
+Reason: {analysis.get('reason', 'None')}{unsubscribe_section}
 ========================
 """
                 
