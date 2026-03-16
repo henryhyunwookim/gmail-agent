@@ -106,26 +106,26 @@ class EmailSummarizer:
         if include_translation:
             prompt = f"""You are an intelligent email assistant specialized in Chinese language learning. Analyze the following FTChinese email and provide a structured learning breakdown.
 
-Email Subject: {{email_content['subject']}}
-Email Sender: {{email_content['sender']}}
+Email Subject: {email_content['subject']}
+Email Sender: {email_content['sender']}
 Email Body:
-{{email_content['body'][:4000]}}
+{email_content['body'][:4000]}
 
 IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additional text):
-{{{{
+{{
     "action_required": true,
     "reason": "Brief explanation of why action is or isn't required",
     "learning_segments": [
-        {{{{
+        {{
             "original": "...",
             "pinyin": "...",
             "vocabulary": [
                 {{"word": "...", "pinyin": "...", "english": "..."}}
             ],
             "translation": "..."
-        }}}}
+        }}
     ]
-}}}}
+}}
 
 Rules:
 - action_required: true if the email requires a response or action from the recipient, false otherwise
@@ -138,23 +138,23 @@ Rules:
         else:
             prompt = f"""You are an intelligent email assistant. Analyze the following email and provide a structured response.
 
-Email Subject: {{email_content['subject']}}
-Email Sender: {{email_content['sender']}}
+Email Subject: {email_content['subject']}
+Email Sender: {email_content['sender']}
 Email Body:
-{{email_content['body'][:4000]}}
+{email_content['body'][:4000]}
 
 IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additional text):
-{{{{
+{{
     "summary": "A concise 1-2 sentence overall summary of the email",
     "sections": [
-        {{{{
+        {{
             "topic": "Topic or theme of this section",
             "insight": "Key insight, information, or takeaway from this section"
-        }}}}
+        }}
     ],
     "action_required": true,
     "reason": "Brief explanation of why action is or isn't required"
-}}}}
+}}
 
 Rules:
 - summary: Concise overall summary of the email (1-2 sentences)
