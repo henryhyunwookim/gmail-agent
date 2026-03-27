@@ -36,7 +36,7 @@ def main():
         summarizer = EmailSummarizer(api_key)
         
         print("Checking for unread emails...")
-        messages = client.list_unread_messages(max_results=50)  # Increased from 5 to 50
+        messages = client.list_unread_messages(max_results=10)
         
         if not messages:
             print("No unread messages found.")
@@ -119,6 +119,9 @@ def main():
                 if is_ftchinese and analysis.get('learning_segments'):
                     translation_section = "\n\n=== CHINESE STUDY CORNER ===\n"
                     for i, segment in enumerate(analysis['learning_segments'], 1):
+                        if i == 5:
+                            break
+
                         translation_section += f"\n[Sentence {i}]\n"
                         translation_section += f"Original: {segment.get('original', '')}\n\n"
                         translation_section += f"Pinyin:   {segment.get('pinyin', '')}\n\n"

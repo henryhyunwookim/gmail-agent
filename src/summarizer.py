@@ -5,7 +5,7 @@ import json
 class EmailSummarizer:
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
     
     def extract_unsubscribe_link(self, email_body):
         """Extracts unsubscribe link from email body if present."""
@@ -130,8 +130,8 @@ IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additi
 Rules:
 - action_required: true if the email requires a response or action from the recipient, false otherwise
 - reason: Brief explanation (one sentence)
-- learning_segments: Break the email body down **sentence by sentence**. Each segment should represent exactly one distinct sentence of the article content.
-- EXCLUDE any promotional content, advertisements, newsletter subscription reminders, or FTChinese membership benefits from the learning_segments. Focus ONLY on the actual article or main content.
+- learning_segments: Break the email body down **sentence by sentence** for the first 5 distinct sentences of the main article content. Each segment should represent exactly one distinct sentence.
+- EXCLUDE any promotional content, advertisements, newsletter subscription reminders, or FTChinese membership benefits from the learning_segments. Focus ONLY on the first 5 sentences of the actual article or main content.
 - For each sentence in learning_segments, you MUST provide the original Chinese text, the pinyin with tone marks, a list of up to 3 key vocabulary words, and the English translation.
 - Output ONLY the JSON object, nothing else
 """
