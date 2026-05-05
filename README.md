@@ -166,7 +166,7 @@ pip install -r requirements.txt
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
-3. Enable the Gmail API
+3. **IMPORTANT**: Enable the **Gmail API** and **Generative Language API** for your project in the [API Library](https://console.cloud.google.com/apis/library).
 4. Create OAuth 2.0 credentials (Desktop app)
 5. Download `credentials.json` and place it in the project root
 
@@ -196,13 +196,13 @@ TIMEZONE=Asia/Seoul
 
 ### 5. Authenticate Gmail
 
-Run the agent locally once to authenticate:
+Run the debug script locally once to authenticate and verify your setup:
 
 ```bash
-python -m src.main
+python src/debug_run.py
 ```
 
-This will open a browser window for Gmail authentication and create `token.json`.
+This will open a browser window for Gmail authentication and create `token.json`. It also verifies that both Gmail and Gemini APIs are correctly configured.
 
 ## Local Usage
 
@@ -340,6 +340,13 @@ These files contain sensitive authentication data.
 ### "could not locate runnable browser"
 - Ensure `token.json` is included in `Dockerfile`
 - Run locally first to generate `token.json`
+
+### "Error 403: access_denied" (OAuth Blocked)
+- Ensure your email is added to the **Test Users** list in the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent) settings.
+- If the app is in "Testing" mode, only approved users can log in.
+
+### "Gmail API has not been used... or it is disabled"
+- Click the link provided in the error message to enable the Gmail API for your project in the Google Cloud Console.
 
 ### Billing Error
 - Enable billing in Google Cloud Console

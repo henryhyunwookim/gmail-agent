@@ -29,8 +29,24 @@ def main():
     try:
         creds = authenticate_gmail()
         print("Authentication successful", flush=True)
+        
+        print("Initializing GmailClient...", flush=True)
+        client = GmailClient(creds)
+        print("Fetching unread messages...", flush=True)
+        messages = client.list_unread_messages(max_results=1)
+        print(f"Successfully fetched {len(messages)} messages.", flush=True)
+        
+        print("Verifying Gemini API...", flush=True)
+        summarizer = EmailSummarizer(api_key)
+        # Just a simple test
+        is_purchase = summarizer.is_purchase_email({'subject': 'Test Order', 'body': 'Your order #123', 'sender': 'amazon.com'})
+        print(f"Summarizer check: {is_purchase}", flush=True)
+        
+        print("\nVerification COMPLETE. Ready for deployment.", flush=True)
     except Exception as e:
-        print(f"Authentication failed: {e}", flush=True)
+        print(f"Verification failed: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
