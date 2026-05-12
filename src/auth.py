@@ -23,8 +23,13 @@ def authenticate_gmail():
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                print(f"Error refreshing token: {e}")
+                creds = None
+        
+        if not creds:
             # Check if running in a cloud environment (no browser available)
             is_cloud = os.getenv('K_SERVICE') is not None  # Cloud Run sets this
             
