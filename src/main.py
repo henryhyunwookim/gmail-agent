@@ -119,7 +119,7 @@ def main():
                 if is_ftchinese and analysis.get('learning_segments'):
                     translation_section = "\n\n=== CHINESE STUDY CORNER ===\n"
                     for i, segment in enumerate(analysis['learning_segments'], 1):
-                        if i == 3:
+                        if i == 4:
                             break
 
                         translation_section += f"\n[Sentence {i}]\n"
