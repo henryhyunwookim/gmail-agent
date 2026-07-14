@@ -16,7 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY credentials.json .
 COPY .env .
-COPY token.json .
 
 # Add /app to PYTHONPATH so we can import 'src' as a package
 ENV PYTHONPATH=/app
