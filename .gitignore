@@ -40,7 +40,8 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
-tests/
 
-# Promo
+# Large media & generated data
+notebookLM/
 promo_materials/
+digest_output/

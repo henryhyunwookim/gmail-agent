@@ -199,7 +199,7 @@ TIMEZONE=Asia/Seoul
 Run the debug script locally once to authenticate and verify your setup:
 
 ```bash
-python src/debug_run.py
+python tests/debug_run.py
 ```
 
 This will open a browser window for Gmail authentication and create `token.json`. It also verifies that both Gmail and Gemini APIs are correctly configured.
@@ -293,15 +293,16 @@ gmail-agent/
 │   ├── .env.example        # Template for environment variables
 │   ├── DEPLOYMENT.md       # Detailed deployment guide
 │   └── deploy_cloud.ps1    # Cloud deployment script
-├── notebookLM/             # Personalization assets (infographic, video)
 ├── src/
 │   ├── app.py              # Flask web server for Cloud Run
 │   ├── auth.py             # Gmail authentication
-│   ├── debug_run.py        # Debugging utility
 │   ├── gmail_client.py     # Gmail API client
-│   ├── list_models.py      # Utility to list available Gemini models
 │   ├── main.py             # Main application logic
 │   └── summarizer.py       # AI summarization logic
+├── tests/
+│   ├── debug_run.py        # Debugging / verification utility
+│   ├── list_models.py      # Utility to list available Gemini models
+│   └── test_summarizer.py  # Summarizer unit tests
 ├── Dockerfile              # Container configuration
 ├── LICENSE                 # Project license
 ├── README.md               # Project documentation

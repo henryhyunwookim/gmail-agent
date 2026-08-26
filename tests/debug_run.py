@@ -1,18 +1,22 @@
 import sys
+import os
 print("Starting debug...", flush=True)
 
+# Add project root to path so we can import from src/
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 print("Importing os...", flush=True)
-import os
 print("Importing time...", flush=True)
 import time
 print("Importing dotenv...", flush=True)
 from dotenv import load_dotenv
 print("Importing auth...", flush=True)
-from auth import authenticate_gmail
+from src.auth import authenticate_gmail
 print("Importing gmail_client...", flush=True)
-from gmail_client import GmailClient
+from src.gmail_client import GmailClient
 print("Importing summarizer...", flush=True)
-from summarizer import EmailSummarizer
+from src.summarizer import EmailSummarizer
+
 
 print("Imports done.", flush=True)
 

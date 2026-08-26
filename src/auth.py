@@ -88,7 +88,7 @@ def save_token_to_secret_manager(creds):
 def authenticate_gmail(force_interactive=False):
     """Authenticates with Gmail API.
     
-    On Cloud Run: loads token from Secret Manager, refreshes if needed, saves back.
+    On Cloud Run: loads token from Secret Manager, refreshes in-memory if needed.
     Locally: uses token.json file as before.
     """
     creds = None
@@ -118,10 +118,9 @@ def authenticate_gmail(force_interactive=False):
             try:
                 print("Attempting to refresh access token...")
                 creds.refresh(Request())
-                # Save the refreshed token
-                if on_cloud_run:
-                    save_token_to_secret_manager(creds)
-                else:
+                # Local: save refreshed token to disk
+                # Cloud Run: refreshed in-memory only (avoids creating unneeded billable secret versions)
+                if not on_cloud_run:
                     with open('token.json', 'w') as token:
                         token.write(creds.to_json())
                         print("Saved refreshed token to token.json.")
