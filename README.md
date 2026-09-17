@@ -17,6 +17,8 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 The system is designed as a cloud-native application running on **Google Cloud Platform (GCP)**, leveraging **Google Gemini 3.8 Flash** for high-speed, cost-effective AI analysis.
 
+![Gmail Agent Architecture & Workflow Overview](docs/assets/architecture_overview.png)
+
 ```mermaid
 graph TD
     subgraph Google Cloud Platform
@@ -61,7 +63,7 @@ graph TD
 The application follows a linear execution pipeline, optimized for batch processing:
 
 1.  **Trigger & Auth**: The Cloud Scheduler triggers the container. The app authenticates with Gmail using OAuth 2.0.
-2.  **Fetch**: Retrieves the last 20 unread emails from the inbox.
+2.  **Fetch**: Retrieves the last 10 unread emails from the inbox.
 3.  **Smart Filtering**:
     *   **Self-Sent**: Ignores emails sent by the user to avoid loops.
     *   **Redundancy Check**: Skips threads that have already been summarized by the agent (checks for "Fwd:" from user).
@@ -207,7 +209,7 @@ python -m src.main
 ```
 
 This will:
-- Check for unread emails (up to 20)
+- Check for unread emails (up to 10)
 - Summarize them using Gemini AI with section-based insights
 - Forward summaries to your email within the original thread
 - Apply Gmail labels (`ActionRequired` or `ReadLater`)
@@ -240,7 +242,7 @@ The script will:
 Check the logs:
 
 ```powershell
-gcloud run services logs read gmail-agent --region=us-central1 --limit=20
+gcloud run services logs read gmail-agent --region=us-central1 --limit=10
 ```
 
 Or manually trigger:
@@ -256,7 +258,7 @@ gcloud scheduler jobs run gmail-agent-daily-trigger --location=us-central1
 Edit `src/main.py`:
 
 ```python
-messages = client.list_unread_messages(max_results=20)  # Change this number
+messages = client.list_unread_messages(max_results=10)  # Change this number
 ```
 
 ### Schedule
@@ -287,6 +289,8 @@ gmail-agent/
 │   ├── .env.example        # Template for environment variables
 │   ├── DEPLOYMENT.md       # Detailed deployment guide
 │   └── deploy_cloud.ps1    # Cloud deployment script
+├── docs/
+│   └── assets/             # Architecture overview & documentation assets
 ├── src/
 │   ├── app.py              # Flask web server for Cloud Run
 │   ├── auth.py             # Gmail authentication
