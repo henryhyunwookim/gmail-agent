@@ -10,6 +10,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 - 🎯 **Action Detection**: Automatically identifies emails requiring your attention
 - 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ReadLater`)
 - 🔗 **Unsubscribe Detection**: Automatically extracts unsubscribe/opt-out links for easy access
+- ⚙️ **Configurable Limits & Schedule**: Easily adjust the batch size of emails to read (default: 20) and execution schedule (cron/intervals) without touching code
 - ☁️ **Cloud Deployment**: Runs on Google Cloud Run (Free Tier eligible)
 
 
@@ -22,7 +23,7 @@ The system is designed as a cloud-native application running on **Google Cloud P
 ```mermaid
 graph TD
     subgraph Google Cloud Platform
-        Scheduler[Cloud Scheduler] -->|Trigger 5AM/5PM| CloudRun[Cloud Run Service]
+        Scheduler[Cloud Scheduler] -->|Trigger via Configured Cron| CloudRun[Cloud Run Service]
         CloudRun -->|Runs| App[Flask App]
         App -->|Executes| Main[Main Logic]
     end
@@ -51,7 +52,7 @@ graph TD
 
 ### System Components
 
-*   **Cloud Scheduler**: The "alarm clock" that triggers the system twice daily (5:00 AM/PM).
+*   **Cloud Scheduler**: The configurable "alarm clock" that triggers the system according to your custom cron schedule (defaults to twice daily at 5:00 AM/PM, fully customizable via `.env`).
 *   **Cloud Run**: The serverless compute environment that hosts and executes the agent container.
 *   **Gmail Client**: The internal Python module that handles authentication, fetches emails, and constructs the summary emails.
 *   **AI Summarizer**: The intelligence layer that prepares prompts for Gemini and interprets the structured JSON response.
@@ -62,8 +63,8 @@ graph TD
 
 The application follows a linear execution pipeline, optimized for batch processing:
 
-1.  **Trigger & Auth**: The Cloud Scheduler triggers the container. The app authenticates with Gmail using OAuth 2.0.
-2.  **Fetch**: Retrieves the last 10 unread emails from the inbox.
+1.  **Trigger & Auth**: The Cloud Scheduler triggers the container (or triggered manually/locally). The app authenticates with Gmail using OAuth 2.0.
+2.  **Fetch**: Retrieves unread emails from the inbox according to the configured batch limit (default: 20 emails, customizable via `MAX_EMAILS` or CLI).
 3.  **Smart Filtering**:
     *   **Self-Sent**: Ignores emails sent by the user to avoid loops.
     *   **Redundancy Check**: Skips threads that have already been summarized by the agent (checks for "Fwd:" from user).
@@ -181,6 +182,9 @@ cp .env.example .env
 ```env
 GEMINI_API_KEY=your_actual_api_key
 
+# Email Processing Configuration
+MAX_EMAILS=20
+
 # GCP Configuration (needed for cloud deployment)
 GCP_PROJECT_ID=your-gcp-project-id
 GCP_REGION=us-central1
@@ -208,8 +212,20 @@ Run the agent manually:
 python -m src.main
 ```
 
+Or specify a custom email batch limit via CLI flag:
+
+```bash
+python -m src.main --max-emails 20
+```
+
+Or run continuously on a recurring interval (e.g. every 30 minutes):
+
+```bash
+python -m src.main --interval 30
+```
+
 This will:
-- Check for unread emails (up to 10)
+- Check for unread emails (up to `MAX_EMAILS`, default: 20)
 - Summarize them using Gemini AI with section-based insights
 - Forward summaries to your email within the original thread
 - Apply Gmail labels (`ActionRequired` or `ReadLater`)
@@ -253,22 +269,60 @@ gcloud scheduler jobs run gmail-agent-daily-trigger --location=us-central1
 
 ## Configuration
 
-### Email Processing Limit
+All primary behaviors can be configured without modifying source code by updating your `.env` file or providing command-line arguments.
 
-Edit `src/main.py`:
+### Email Processing Limit (Batch Size)
 
-```python
-messages = client.list_unread_messages(max_results=10)  # Change this number
+You can easily configure the maximum number of unread emails fetched and summarized per run:
+
+- **Via Environment Variable** (applies to both local runs and Cloud Run):
+  Set `MAX_EMAILS` in your `.env` file:
+  ```env
+  # Process up to 20 unread emails per execution cycle (default: 20)
+  MAX_EMAILS=20
+  ```
+
+- **Via Command-Line Argument** (local manual runs):
+  Pass `-n` or `--max-emails` directly to the script:
+  ```bash
+  python -m src.main --max-emails 25
+  ```
+
+- **Via HTTP Trigger** (Cloud Run endpoint):
+  Pass `max_emails` as a URL query parameter or in a JSON body:
+  ```bash
+  curl -X POST "https://<SERVICE_URL>/?max_emails=20"
+  ```
+
+### Schedule & Frequency (When and How Often to Run)
+
+The execution timing and frequency can be tailored to your preference:
+
+#### 1. Cloud Deployment (Cloud Scheduler)
+Configure `SCHEDULE` and `TIMEZONE` in your `.env` file before running `.\deploy_cloud.ps1`. The deployment script will automatically configure or update the Cloud Scheduler job:
+
+```env
+# Standard 5-field cron syntax: (minute hour day-of-month month day-of-week)
+SCHEDULE=0 5,17 * * *
+TIMEZONE=Asia/Seoul
 ```
 
-### Schedule
+Common schedule patterns:
+| Frequency | Cron Expression (`SCHEDULE`) | Description |
+| :--- | :--- | :--- |
+| **Twice daily (Default)** | `0 5,17 * * *` | Runs at 5:00 AM and 5:00 PM every day |
+| **Once daily** | `0 8 * * *` | Runs every morning at 8:00 AM |
+| **Hourly** | `0 * * * *` | Runs at the beginning of every hour |
+| **Every 30 minutes** | `*/30 * * * *` | Runs every 30 minutes |
+| **Weekdays only** | `0 9 * * 1-5` | Runs Monday through Friday at 9:00 AM |
 
-Edit `deploy_cloud.ps1`:
+> **Updating Schedule**: If you want to change the schedule after deploying, simply adjust `SCHEDULE` in `.env` and rerun `.\deploy_cloud.ps1`. Cloud Scheduler will be updated immediately.
 
-```powershell
-$SCHEDULE = "0 5,17 * * *"  # Cron format: daily at 5:00 AM and 5:00 PM
-$TIMEZONE = "Asia/Seoul"  # Your timezone
-```
+#### 2. Local Deployment (Windows Task Scheduler)
+If you run the agent on your Windows computer using Task Scheduler:
+1. Open Task Scheduler (`taskschd.msc`).
+2. Select your `Gmail Agent` task and click **Properties** > **Triggers** tab.
+3. Edit the trigger to set your preferred interval (e.g., daily at specific hours, or repeat every 15/30/60 minutes).
 
 ### Purchase Keywords
 
@@ -294,6 +348,7 @@ gmail-agent/
 ├── src/
 │   ├── app.py              # Flask web server for Cloud Run
 │   ├── auth.py             # Gmail authentication
+│   ├── config.py           # Centralized configuration & defaults
 │   ├── gmail_client.py     # Gmail API client
 │   ├── main.py             # Main application logic
 │   └── summarizer.py       # AI summarization logic

@@ -2,8 +2,19 @@
 # Run this after: python src/auth.py
 # This updates the token in Cloud Run WITHOUT redeploying.
 
-$PROJECT_ID = "gen-lang-client-0480639565"
-$SECRET_NAME = "gmail-agent-token"
+# Read .env file if present
+if (Test-Path ".env") {
+    Get-Content .env | ForEach-Object {
+        if ($_ -match '^\s*([^#][^=]*)\s*=\s*(.*)$') {
+            $name = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            Set-Variable -Name $name -Value $value -Scope Script
+        }
+    }
+}
+
+$PROJECT_ID = if ($GCP_PROJECT_ID) { $GCP_PROJECT_ID } else { (gcloud config get-value project 2>$null).Trim() }
+$SECRET_NAME = if ($SECRET_NAME) { $SECRET_NAME } else { "gmail-agent-token" }
 
 if (-not (Test-Path "token.json")) {
     Write-Error "token.json not found. Run 'python src/auth.py' first to generate it."

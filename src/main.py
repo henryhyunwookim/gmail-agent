@@ -5,10 +5,14 @@ from dotenv import load_dotenv
 from src.auth import authenticate_gmail
 from src.gmail_client import GmailClient
 from src.summarizer import EmailSummarizer
+from src.config import get_max_emails, DEFAULT_MAX_EMAILS, get_interval_minutes
 
-def main():
+def main(max_results=None):
     load_dotenv()
     
+    # Resolve batch limit via centralized configuration
+    max_results = get_max_emails(max_results)
+
     execution_start = datetime.now()
     error_message = None
     stats = {
@@ -35,8 +39,8 @@ def main():
         # Initialize Summarizer
         summarizer = EmailSummarizer(api_key)
         
-        print("Checking for unread emails...")
-        messages = client.list_unread_messages(max_results=10)
+        print(f"Checking for unread emails (limit: {max_results})...")
+        messages = client.list_unread_messages(max_results=max_results)
         
         if not messages:
             print("No unread messages found.")
@@ -224,4 +228,32 @@ Reason: {analysis.get('reason', 'None')}{unsubscribe_section}
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Gmail AI Agent: Automatically summarize unread emails with Gemini AI.")
+    parser.add_argument(
+        "-n", "--max-emails",
+        type=int,
+        default=None,
+        help=f"Maximum number of unread emails to process (defaults to MAX_EMAILS env var or {DEFAULT_MAX_EMAILS})"
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=None,
+        help="Run continuously on a recurring interval (in minutes), e.g. --interval 30 (defaults to RUN_INTERVAL_MINUTES env var)"
+    )
+    cli_args = parser.parse_args()
+    
+    # Check if continuous scheduling was requested
+    interval_mins = get_interval_minutes(cli_args.interval)
+    if interval_mins:
+        print(f"Starting scheduled monitoring: running every {interval_mins} minutes (Press Ctrl+C to stop)...")
+        try:
+            while True:
+                main(max_results=cli_args.max_emails)
+                print(f"\nNext run in {interval_mins} minutes. Waiting...")
+                time.sleep(interval_mins * 60)
+        except KeyboardInterrupt:
+            print("\nMonitoring stopped by user.")
+    else:
+        main(max_results=cli_args.max_emails)

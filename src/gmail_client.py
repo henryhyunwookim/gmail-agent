@@ -3,16 +3,18 @@ from email.mime.text import MIMEText
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from bs4 import BeautifulSoup
+from src.config import get_max_emails
 
 class GmailClient:
     def __init__(self, creds):
         self.service = build('gmail', 'v1', credentials=creds)
 
-    def list_unread_messages(self, max_results=10):
-        """Lists unread messages."""
+    def list_unread_messages(self, max_results=None):
+        """Lists unread messages. Defaults to centralized config limit (get_max_emails)."""
+        limit = get_max_emails(max_results)
         try:
             results = self.service.users().messages().list(
-                userId='me', q='is:unread', maxResults=max_results).execute()
+                userId='me', q='is:unread', maxResults=limit).execute()
             messages = results.get('messages', [])
             return messages
         except HttpError as error:

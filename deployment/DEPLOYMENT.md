@@ -99,7 +99,7 @@ mkdir logs
    - Enable required Google Cloud APIs
    - Build and deploy the container to Cloud Run
    - Create a Service Account for the scheduler
-   - Configure Cloud Scheduler to run daily at 2:00 AM
+   - Configure Cloud Scheduler with your custom schedule and timezone from `.env` (defaults to twice daily at 5:00 AM and 5:00 PM)
 
 ### Pros & Cons
 ✅ Runs 24/7  

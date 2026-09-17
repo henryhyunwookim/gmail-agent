@@ -23,12 +23,20 @@ if (-not $GCP_PROJECT_ID) {
     exit 1
 }
 
+# Retrieve centralized defaults from src.config if not explicitly provided in .env
+$CONFIG_DEFAULTS = try {
+    py -3 -c "import json; from src.config import get_schedule, get_timezone, get_max_emails; print(json.dumps({'schedule': get_schedule(), 'timezone': get_timezone(), 'max_emails': get_max_emails()}))" 2>$null | ConvertFrom-Json
+} catch {
+    $null
+}
+
 $PROJECT_ID = $GCP_PROJECT_ID
 $REGION = if ($GCP_REGION) { $GCP_REGION } else { "us-central1" }
 $SERVICE_NAME = if ($SERVICE_NAME) { $SERVICE_NAME } else { "gmail-agent" }
 $JOB_NAME = if ($JOB_NAME) { $JOB_NAME } else { "gmail-agent-daily-trigger" }
-$SCHEDULE = if ($SCHEDULE) { $SCHEDULE } else { "0 5,17 * * *" }  # Run at 5:00 AM and 5:00 PM every day
-$TIMEZONE = if ($TIMEZONE) { $TIMEZONE } else { "Asia/Seoul" }  # Set to your timezone
+$SCHEDULE = if ($SCHEDULE) { $SCHEDULE } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.schedule) { $CONFIG_DEFAULTS.schedule } else { "0 5,17 * * *" }
+$TIMEZONE = if ($TIMEZONE) { $TIMEZONE } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.timezone) { $CONFIG_DEFAULTS.timezone } else { "Asia/Seoul" }
+$MAX_EMAILS = if ($MAX_EMAILS) { $MAX_EMAILS } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.max_emails) { $CONFIG_DEFAULTS.max_emails } else { 20 }
 
 Write-Host "Deploying Gmail Agent to Google Cloud..." -ForegroundColor Green
 
@@ -51,6 +59,7 @@ Write-Host "Deploying to Cloud Run..."
 gcloud run deploy $SERVICE_NAME `
     --source . `
     --region $REGION `
+    --set-env-vars "MAX_EMAILS=$MAX_EMAILS,SCHEDULE=$SCHEDULE,TIMEZONE=$TIMEZONE" `
     --no-allow-unauthenticated `
     --quiet
 
@@ -98,4 +107,4 @@ else {
 }
 
 Write-Host "Deployment Complete!" -ForegroundColor Green
-Write-Host "Your agent will run twice daily at 5:00 AM and 5:00 PM ($TIMEZONE)."
+Write-Host "Your agent schedule is configured to: '$SCHEDULE' ($TIMEZONE)."
