@@ -3,9 +3,10 @@ import google.generativeai as genai
 import json
 
 class EmailSummarizer:
-    def __init__(self, api_key):
+    def __init__(self, api_key, model_name=None):
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        selected_model = model_name or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        self.model = genai.GenerativeModel(selected_model)
     
     def extract_unsubscribe_link(self, email_body):
         """Extracts unsubscribe link from email body if present."""

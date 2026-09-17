@@ -4,7 +4,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 ## Features
 
-- 🤖 **AI-Powered Summarization**: Uses Gemini 2.5 Flash to create concise email summaries
+- 🤖 **AI-Powered Summarization**: Uses Gemini 3.8 Flash to create concise email summaries
 - 💡 **Section-Based Insights**: Breaks down emails into logical sections with topics and key insights
 - 📚 **Chinese Study Corner**: Automatically detects emails from FTChinese and generates original text, pinyin, and vocabulary
 - 🎯 **Action Detection**: Automatically identifies emails requiring your attention
@@ -15,7 +15,7 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 ## Architecture
 
-The system is designed as a cloud-native application running on **Google Cloud Platform (GCP)**, leveraging **Google Gemini 2.5 Flash** for high-speed, cost-effective AI analysis.
+The system is designed as a cloud-native application running on **Google Cloud Platform (GCP)**, leveraging **Google Gemini 3.8 Flash** for high-speed, cost-effective AI analysis.
 
 ```mermaid
 graph TD
@@ -35,13 +35,13 @@ graph TD
         Main -->|Analyze| Summarizer[AI Summarizer]
         
         %% Data Flow
-        GmailClient -.->|Email Content| Summarizer
         Summarizer -.->|Summary & Actions| GmailClient
+        GmailClient -.->|Email Content| Summarizer
 
         Summarizer -->|Generate Content| GeminiAPI
-        GmailClient -->|Read Emails| GmailAPI
         GmailClient -->|Send Summaries| GmailAPI
         GmailClient -->|Apply Labels| GmailAPI
+        GmailClient -->|Read Emails| GmailAPI
     end
 
     GmailAPI -->|Delivers Summary| User((User))
@@ -54,20 +54,20 @@ graph TD
 *   **Gmail Client**: The internal Python module that handles authentication, fetches emails, and constructs the summary emails.
 *   **AI Summarizer**: The intelligence layer that prepares prompts for Gemini and interprets the structured JSON response.
 *   **Gmail API**: Google's external service that stores your emails and physically delivers the summaries to your inbox.
-*   **Gemini API**: Google's LLM service (Gemini 2.5 Flash) that performs the text analysis and summarization.
+*   **Gemini API**: Google's LLM service (Gemini 3.8 Flash) that performs the text analysis and summarization.
 
 ### Logic Flow
 
 The application follows a linear execution pipeline, optimized for batch processing:
 
 1.  **Trigger & Auth**: The Cloud Scheduler triggers the container. The app authenticates with Gmail using OAuth 2.0.
-2.  **Fetch**: Retrieves the last 50 unread emails from the inbox.
+2.  **Fetch**: Retrieves the last 20 unread emails from the inbox.
 3.  **Smart Filtering**:
     *   **Self-Sent**: Ignores emails sent by the user to avoid loops.
     *   **Redundancy Check**: Skips threads that have already been summarized by the agent (checks for "Fwd:" from user).
     *   **Transactional**: Detects and skips purchase receipts, shipping notifications, and invoices (e.g., from Amazon, PayPal) to focus on communication.
 4.  **AI Analysis**:
-    *   The **EmailSummarizer** sends the email body to **Gemini 2.5 Flash**.
+    *   The **EmailSummarizer** sends the email body to **Gemini 3.8 Flash**.
     *   Gemini generates a structured JSON response containing:
         *   Concise summary.
         *   Key insights/facts.
@@ -114,13 +114,7 @@ As you can imagine, insights can be a lot more helpful for longer emails.
 This agent is highly customizable. While it includes built-in support for **Chinese language learning**, the same logic can be applied to any specialized newsletter, technical digest, or specific communication style.
 
 ### ✨ Example: Custom Study Materials
-The agent can be configured to extract content from specific newsletters and transform them into personalized study or reference materials.
-
-![Personalization Infographic](notebookLM/infographic.png)
-
-### 📺 Video Walkthrough
-Watch how the agent helps in "Taming Your Inbox" and can be tailored for specialized content:
-[**Watch the Personalization Video**](notebookLM/Taming_Your_Inbox.mp4)
+The agent can be configured to extract content from specific newsletters and transform them into personalized study or reference materials (e.g., custom study guides, flashcards, or NotebookLM-generated audio overviews and presentations).
 
 ---
 
@@ -213,7 +207,7 @@ python -m src.main
 ```
 
 This will:
-- Check for unread emails (up to 50)
+- Check for unread emails (up to 20)
 - Summarize them using Gemini AI with section-based insights
 - Forward summaries to your email within the original thread
 - Apply Gmail labels (`ActionRequired` or `ReadLater`)
@@ -246,7 +240,7 @@ The script will:
 Check the logs:
 
 ```powershell
-gcloud run services logs read gmail-agent --region=us-central1 --limit=50
+gcloud run services logs read gmail-agent --region=us-central1 --limit=20
 ```
 
 Or manually trigger:
@@ -262,7 +256,7 @@ gcloud scheduler jobs run gmail-agent-daily-trigger --location=us-central1
 Edit `src/main.py`:
 
 ```python
-messages = client.list_unread_messages(max_results=50)  # Change this number
+messages = client.list_unread_messages(max_results=20)  # Change this number
 ```
 
 ### Schedule
@@ -310,6 +304,7 @@ gmail-agent/
 ├── run_agent.bat           # Windows executable helper
 ├── credentials.json        # Gmail OAuth credentials (not in repo)
 ├── token.json              # Gmail auth token (not in repo)
+├── notebookLM/             # Generated media assets (ignored in .gitignore)
 └── .env                    # Environment variables (not in repo)
 ```
 
