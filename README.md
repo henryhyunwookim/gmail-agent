@@ -316,11 +316,17 @@ gmail-agent/
 
 Running twice per day on Google Cloud Run:
 
-- **Cloud Run**: $0.00/month (within free tier - 60 runs/month vs 2M limit)
-- **Cloud Scheduler**: $0.00/month (1 job vs 3 jobs free)
-- **Gemini API**: $0.00/month (generous free tier)
+- **Cloud Run (Compute)**: $0.00/month (within free tier — ~60 runs/month vs. 2M free requests limit).
+- **Cloud Scheduler**: $0.00/month (1 job configured vs. 3 free jobs allowance per billing account).
+- **Gemini API**: $0.00/month (Google AI Studio free tier for Gemini Flash models).
+- **Auxiliary Services (Storage & Egress)**: ~$0.05 – $0.10/month (~0.3 JPY / day):
+  - *Artifact Registry*: Stores the Docker container image (0.5 GB/month is free; excess image storage is billed at ~$0.10/GB/month).
+  - *Network Egress*: Minor cross-region data transfer fees when calling Gmail and Gemini APIs.
+  - *Secret Manager* (if used): 6 active secret versions are free per month.
 
-**Total**: Free! 🎉
+**Total**: **Essentially free** (~$0.05 – $0.10/month or ~10 JPY/month).
+
+> **Tip**: For a completely $0.00 setup without any cloud infrastructure or storage fees, run the agent locally via Windows Task Scheduler (see [Option 1 in DEPLOYMENT.md](deployment/DEPLOYMENT.md)).
 
 ## Security Notes
 

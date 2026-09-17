@@ -105,7 +105,7 @@ mkdir logs
 ✅ Runs 24/7  
 ✅ No local computer needed  
 ✅ Reliable and scalable  
-✅ **Free Tier Friendly**: 1 run/day is $0.00/month  
+✅ **Free Tier Friendly**: Compute is free; minimal auxiliary costs (~0.3 JPY/day or ~$0.05–$0.10/month)  
 ❌ Requires Google Cloud account
 
 ---
