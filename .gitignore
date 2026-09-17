@@ -43,6 +43,5 @@ htmlcov/
 
 # Large media & generated data
 notebookLM/
-notebooklm/
 promo_materials/
 digest_output/
