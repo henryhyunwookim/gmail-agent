@@ -12,10 +12,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and config
+# Copy source code only — secrets/credentials are resolved at runtime from
+# Google Cloud Secret Manager and Cloud Run environment variables.
 COPY src/ ./src/
-COPY credentials.json .
-COPY .env .
 
 # Add /app to PYTHONPATH so we can import 'src' as a package
 ENV PYTHONPATH=/app

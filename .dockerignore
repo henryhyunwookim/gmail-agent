@@ -1,0 +1,52 @@
+# Secrets & credentials — resolved from Secret Manager at runtime
+.env
+*.env.*
+credentials.json
+token.json
+*.key
+*.pem
+*.p12
+service_account*.json
+
+# Local state & logs — stored in GCS at runtime
+state.json
+run_log.json
+*.tmp
+*.log
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tests & scratch
+tests/
+test/
+scratch/
+tmp/
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# CI
+.github/
+
+# Local notebooks & materials
+notebookLM/
+promo_materials/
+digest_output/
