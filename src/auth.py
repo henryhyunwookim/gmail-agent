@@ -1,8 +1,35 @@
+"""
+Universal Gmail API Authentication (`src.auth`)
+==============================================
+
+Purpose:
+    Provides portable, zero-setup OAuth 2.0 authentication for the Gmail API
+    across local developer machines, headless servers, and Google Cloud Run.
+
+Resolution Priority Cascade:
+    1. Local `token.json` file (if explicitly provided in the workspace root).
+    2. OS Temporary Directory token cache (`tempfile.gettempdir()`), avoiding workspace pollution.
+    3. Google Cloud Secret Manager (`gmail-agent-token`).
+
+In-Memory Token Refresh & Secret Manager Sync:
+    - If a cached or Secret Manager token is expired, `google.auth` automatically
+      refreshes the access token in-memory using its refresh token.
+    - Updated credentials are saved back to Secret Manager and the OS temp cache,
+      guaranteeing the local Git workspace remains completely clean.
+
+Zero-Setup Interactive Flow:
+    If no valid token exists, the tool automatically fetches OAuth client secrets
+    from Secret Manager (`gmail-oauth-credentials`), spins up a local loopback server,
+    and opens the user's browser for authorization.
+"""
+from __future__ import annotations
+
 import json
 import os
+import subprocess
 import sys
 import tempfile
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -10,30 +37,48 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 from src.config import get_project_id, resolve_cloud_secret
 
-# If modifying these scopes, update token in Secret Manager
-SCOPES = [
+
+# ==============================================================================
+# SECTION 1: Constants & Scopes
+# ==============================================================================
+
+# OAuth 2.0 Scopes required for Gmail inbox monitoring, summarization, and labeling
+SCOPES: list[str] = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.modify",
 ]
 
-# Secret Manager configuration keys
-TOKEN_SECRET_NAME = os.getenv("GMAIL_TOKEN_SECRET_NAME", "gmail-agent-token")
-CREDENTIALS_SECRET_NAME = os.getenv("GMAIL_CREDENTIALS_SECRET_NAME", "gmail-oauth-credentials")
+# Secret Manager secret names for credential persistence
+TOKEN_SECRET_NAME: str = os.getenv("GMAIL_TOKEN_SECRET_NAME", "gmail-agent-token")
+CREDENTIALS_SECRET_NAME: str = os.getenv("GMAIL_CREDENTIALS_SECRET_NAME", "gmail-oauth-credentials")
 
-# Temp cache path to avoid workspace root pollution
-TEMP_TOKEN_CACHE = os.path.join(tempfile.gettempdir(), "gmail_agent_token.json")
+# OS Temporary Directory token cache to prevent workspace pollution
+TEMP_TOKEN_CACHE: str = os.path.join(tempfile.gettempdir(), "gmail_agent_token.json")
 
+
+# ==============================================================================
+# SECTION 2: Cloud Secret Retrieval & Token Persistence
+# ==============================================================================
 
 def _is_cloud_run() -> bool:
-    """Check if running on Cloud Run."""
+    """
+    Detects whether the application is running inside a Google Cloud Run container.
+
+    Returns:
+        True if K_SERVICE environment variable is populated by Cloud Run.
+    """
     return os.getenv("K_SERVICE") is not None
 
 
-def load_token_from_secret_manager() -> Optional[Dict[str, Any]]:
+def load_token_from_secret_manager() -> dict[str, Any] | None:
     """
-    Load token content from Google Cloud Secret Manager using dual-mode resolution
-    (Python SDK first, falling back to gcloud CLI).
+    Loads serialized token dictionary from Google Cloud Secret Manager.
+
+    Uses dual-mode resolution (Python SDK first, falling back to gcloud CLI).
+
+    Returns:
+        Dictionary containing OAuth token data, or None if unavailable.
     """
     project_id = get_project_id()
     if not project_id:
@@ -55,7 +100,15 @@ def load_token_from_secret_manager() -> Optional[Dict[str, Any]]:
 
 
 def save_token_to_secret_manager(creds: Credentials) -> bool:
-    """Save refreshed or newly authorized token back to Secret Manager."""
+    """
+    Saves refreshed or newly authorized OAuth credentials back to Secret Manager.
+
+    Args:
+        creds: Authenticated google.oauth2.credentials.Credentials instance.
+
+    Returns:
+        True if the secret version was created successfully, False otherwise.
+    """
     project_id = get_project_id()
     if not project_id:
         print("[AUTH] WARNING: Could not determine project ID for Secret Manager.")
@@ -63,7 +116,9 @@ def save_token_to_secret_manager(creds: Credentials) -> bool:
 
     token_json = creds.to_json()
 
+    # --------------------------------------------------------------------------
     # Method 1: Google Cloud Secret Manager SDK
+    # --------------------------------------------------------------------------
     try:
         from google.cloud import secretmanager
 
@@ -80,11 +135,12 @@ def save_token_to_secret_manager(creds: Credentials) -> bool:
     except Exception:
         pass
 
-    # Method 2: gcloud CLI fallback
+    # --------------------------------------------------------------------------
+    # Method 2: gcloud CLI Fallback
+    # --------------------------------------------------------------------------
     try:
-        import subprocess
         is_win = sys.platform == "win32"
-        # Write to temporary file for gcloud CLI input
+        # Write to OS temp directory strictly outside the repository workspace
         with open(TEMP_TOKEN_CACHE, "w", encoding="utf-8") as f:
             f.write(token_json)
         cmd = [
@@ -97,16 +153,23 @@ def save_token_to_secret_manager(creds: Credentials) -> bool:
             f"--project={project_id}",
         ]
         subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=15, shell=is_win)
-        print(f"[AUTH] Successfully uploaded token to Secret Manager via gcloud CLI.")
+        print("[AUTH] Successfully uploaded token to Secret Manager via gcloud CLI.")
         return True
     except Exception as e:
         print(f"[AUTH] Failed to save token to Secret Manager: {e}")
         return False
 
 
-def load_credentials_config() -> Optional[Dict[str, Any]]:
+# ==============================================================================
+# SECTION 3: Client Secrets Resolution
+# ==============================================================================
+
+def load_credentials_config() -> dict[str, Any] | None:
     """
-    Loads OAuth client secrets config from local file, OS temp cache, or Secret Manager.
+    Loads OAuth client secrets config from local file or Cloud Secret Manager.
+
+    Returns:
+        Dictionary containing client secrets config, or None if missing.
     """
     # 1. Local workspace file if explicitly present
     if os.path.exists("credentials.json"):
@@ -129,24 +192,36 @@ def load_credentials_config() -> Optional[Dict[str, Any]]:
     return None
 
 
+# ==============================================================================
+# SECTION 4: Universal Authentication Resolver
+# ==============================================================================
+
 def authenticate_gmail(force_interactive: bool = False) -> Credentials:
     """
-    Universal Gmail API authentication for ANY machine (local PC, laptop, or Cloud Run).
-    Resolution priority:
-      1. Local token.json (if explicitly placed)
-      2. OS temp directory token cache
-      3. Google Cloud Secret Manager ('gmail-agent-token')
-    
-    If token is expired:
-      Refreshes in-memory and updates temp cache (workspace root is kept clean).
-    
-    If interactive login is required:
-      Downloads client credentials from Secret Manager in-memory and opens browser.
+    Universal Gmail API authentication for ANY environment (local PC, laptop, or Cloud Run).
+
+    Resolution Flow:
+      1. Load credentials from local `token.json`, OS temp cache, or Cloud Secret Manager.
+      2. If expired, refreshes access token in-memory using refresh token.
+      3. If interactive login is required:
+         - Fetches OAuth client credentials from Secret Manager in-memory.
+         - Starts local loopback authorization server and launches browser.
+         - Synchronizes newly acquired token to Cloud Secret Manager and OS temp cache.
+
+    Args:
+        force_interactive: If True, bypasses caches and forces browser OAuth login.
+
+    Returns:
+        Valid google.oauth2.credentials.Credentials instance.
+
+    Raises:
+        RuntimeError: If token is expired or missing in a non-interactive/Cloud Run context.
+        FileNotFoundError: If OAuth client credentials cannot be found in Secret Manager.
     """
-    creds = None
+    creds: Credentials | None = None
     on_cloud_run = _is_cloud_run()
 
-    # --- 1. Load existing credentials ---
+    # --- Step 1: Load existing credentials ---
     if not force_interactive:
         # Check local file
         if os.path.exists("token.json"):
@@ -174,7 +249,7 @@ def authenticate_gmail(force_interactive: bool = False) -> Credentials:
                     print(f"[AUTH] Error parsing token from Secret Manager: {e}")
                     creds = None
 
-    # --- 2. Refresh or re-authenticate ---
+    # --- Step 2: Refresh or re-authenticate ---
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
@@ -228,6 +303,10 @@ def authenticate_gmail(force_interactive: bool = False) -> Credentials:
 
     return creds
 
+
+# ==============================================================================
+# SECTION 5: Interactive CLI Entry Point
+# ==============================================================================
 
 if __name__ == "__main__":
     print("Gmail Agent - Interactive Re-authentication Tool")

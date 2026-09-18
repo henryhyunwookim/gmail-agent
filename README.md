@@ -206,13 +206,13 @@ TIMEZONE=Asia/Seoul
 
 ### 5. Authenticate Gmail
 
-Run the debug script locally once to authenticate and verify your setup:
+Run the authentication tool locally once to authorize your account and verify API connectivity:
 
 ```bash
-python tests/debug_run.py
+python -m src.auth
 ```
 
-This will open a browser window for Gmail authentication and create `token.json`. It also verifies that both Gmail and Gemini APIs are correctly configured.
+This will open a browser window for Google OAuth 2.0 authentication, save the credentials, and automatically synchronize the token to Google Cloud Secret Manager (`gmail-agent-token`) for zero-setup execution across all your machines and Cloud Run.
 
 ## Local Usage
 
@@ -255,13 +255,17 @@ This will:
 2. Run the deployment script:
 
 ```powershell
-.\deploy_cloud.ps1
+# Standard deployment (reads .env or gcloud config defaults):
+.\deployment\deploy_cloud.ps1
+
+# Or with explicit parameters:
+.\deployment\deploy_cloud.ps1 -ProjectId "YOUR_PROJECT_ID" -Region "us-central1" -Schedule "0 5,17 * * *"
 ```
 
 The script will:
 - Build and deploy the container to Cloud Run
-- Create a Cloud Scheduler job to run twice daily at 5:00 AM and 5:00 PM
-- Set up all necessary permissions
+- Create a Cloud Scheduler job to run according to your configured schedule (defaults to 5:00 AM and 5:00 PM)
+- Configure service account IAM permissions (`roles/run.invoker`)
 
 ### Verify Deployment
 
@@ -374,28 +378,31 @@ python sync_secrets.py
 
 ```
 gmail-agent/
+├── .dockerignore           # Container build ignore rules
+├── .gitignore              # Comprehensive Git hygiene & secret protections
+├── Dockerfile              # Container image definition for Google Cloud Run
+├── LICENSE                 # Project license
+├── README.md               # Production architecture & onboarding guide
+├── requirements.txt        # Python dependencies (includes cloud secret & storage SDKs)
+├── run_agent.bat           # Windows executable & Task Scheduler launcher
+├── sync_secrets.py         # Convenience CLI entry point for secret synchronization
 ├── deployment/
 │   ├── .env.example        # Reference template for cloud variables (optional locally)
-│   ├── DEPLOYMENT.md       # Detailed deployment guide
-│   ├── deploy_cloud.ps1    # Cloud deployment script (Cloud Run + Scheduler)
+│   ├── DEPLOYMENT.md       # Multi-platform deployment guide
+│   ├── deploy_cloud.ps1    # Automated Cloud Run & Cloud Scheduler deployment script
 │   ├── sync_secrets.py     # Tool to sync local credentials to Secret Manager
 │   └── upload_token.ps1    # Token upload utility
 ├── docs/
-│   └── assets/             # Architecture overview & documentation assets
-├── src/
-│   ├── app.py              # Flask web server for Cloud Run
-│   ├── auth.py             # Dual-mode multi-PC Gmail authentication
-│   ├── config.py           # Centralized configuration & Secret Manager resolution
-│   ├── gmail_client.py     # Gmail API client
-│   ├── main.py             # Main application logic & CLI runner
-│   ├── storage.py          # Google Cloud Storage state & decoupled run logging
-│   └── summarizer.py       # AI summarization logic (Gemini 3.8 Flash)
-├── sync_secrets.py         # Convenience CLI entry point for secret synchronization
-├── Dockerfile              # Container configuration
-├── LICENSE                 # Project license
-├── README.md               # Project documentation
-├── requirements.txt        # Python dependencies (includes cloud secret & storage SDKs)
-└── run_agent.bat           # Windows executable helper
+│   └── assets/             # Architecture overview diagrams & documentation assets
+└── src/
+    ├── __init__.py         # Package marker & exported module declarations
+    ├── app.py              # Flask HTTP webhook entry point for Cloud Run
+    ├── auth.py             # Dual-mode multi-PC Gmail OAuth 2.0 resolver
+    ├── config.py           # Centralized configuration & Secret Manager resolution
+    ├── gmail_client.py     # Gmail API client & RFC 822 MIME message builder
+    ├── main.py             # End-to-end batch processing pipeline & CLI runner
+    ├── storage.py          # Google Cloud Storage state & decoupled run logging
+    └── summarizer.py       # AI summarization logic (Gemini 3.8 Flash)
 ```
 
 ## Cost Estimate
@@ -421,7 +428,7 @@ Running twice per day on Google Cloud Run:
 - `token.json`
 - `.env`
 
-These files contain sensitive authentication data.
+These files contain sensitive authentication data and are protected by `.gitignore`.
 
 ## Troubleshooting
 
@@ -429,9 +436,10 @@ These files contain sensitive authentication data.
 - Ensure `PYTHONPATH=/app` is set in `Dockerfile`
 - All imports use absolute paths (`from src.module import ...`)
 
-### "could not locate runnable browser"
-- Ensure `token.json` is included in `Dockerfile`
-- Run locally first to generate `token.json`
+### "could not locate runnable browser" (Headless / Cloud Run Auth Error)
+- Do not run interactive OAuth on headless Cloud Run.
+- Authenticate locally first: `python -m src.auth`
+- Synchronize token to Secret Manager: `python sync_secrets.py` (or `.\deployment\upload_token.ps1`). Cloud Run resolves the token directly from Secret Manager at runtime without rebuilding containers.
 
 ### "Error 403: access_denied" (OAuth Blocked)
 - Ensure your email is added to the **Test Users** list in the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent) settings.

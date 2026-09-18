@@ -1,53 +1,77 @@
-# Sensitive files - DO NOT COMMIT
+# ==============================================================================
+# Git Ignore Configuration - Gmail Agent Workspace
+# ==============================================================================
+
+# --- Secrets & Sensitive Credentials (DO NOT COMMIT) ---
 credentials.json
 token.json
 .env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+service_account*.json
+secrets.yaml
 
-# Python
+# --- Python Ecosystem & Build Caches ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
+.venv/
 venv/
+env/
 ENV/
 env.bak/
 venv.bak/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# IDE
+# --- IDE & Editor Settings ---
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.bak
 
-# OS
-.DS_Store
+# --- Operating System Artifacts ---
+# Windows
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+# Linux
+.fuse_hidden*
 
-# Logs
+# --- Local Logs & Operational State ---
 logs/
 *.log
+state.json
+run_log.json
+*.json.bak
+*.tmp
+tmp/
+temp/
+scratch/
+.cache/
 
-# Google Cloud
+# --- Google Cloud ---
 .gcloudignore
 
-# Misc
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Large media & generated data
+# --- Large Media & Generated Datasets ---
 notebookLM/
 promo_materials/
 digest_output/
-
-# Cloud state and ephemeral caches
-*.json.bak
-state.json
-run_log.json
-*.tmp

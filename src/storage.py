@@ -1,10 +1,34 @@
+"""
+Cloud Storage & Decoupled Audit Logging (`src.storage`)
+======================================================
+
+Purpose:
+    Provides resilient, dual-mode persistence for agent operational state and
+    audit logs to Google Cloud Storage (GCS) and Google Cloud Logging without
+    polluting the local workspace root or Git repository.
+
+Zero-Workspace-Pollution Guarantee:
+    All local caches and fallbacks are strictly confined to the operating system's
+    designated temporary directory (`tempfile.gettempdir()`). No state, cache, or
+    ephemeral log files are ever written to the Git workspace.
+
+Dual-Mode Architecture:
+    - On Google Cloud Run: Uses Python `google.cloud.storage` SDK with the container's
+      Service Account credentials.
+    - On Local Workstations: Attempts gcloud CLI first (`gcloud storage`), falling back
+      to the Python SDK and local OS temp cache.
+    - Structured stdout logs (`[AUDIT_LOG]`) are automatically ingested by Google Cloud
+      Logging when running on Cloud Run.
+"""
+from __future__ import annotations
+
 import json
 import os
 import subprocess
 import sys
 import tempfile
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from src.config import (
     get_gcs_bucket_name,
@@ -13,17 +37,41 @@ from src.config import (
     get_project_id,
 )
 
-# Local cache paths default exclusively to OS temp directory to prevent workspace pollution
-_LOCAL_STATE_CACHE = os.path.join(tempfile.gettempdir(), "gmail_agent_state_cache.json")
-_LOCAL_LOG_CACHE = os.path.join(tempfile.gettempdir(), "gmail_agent_run_log_cache.json")
+# ==============================================================================
+# SECTION 1: Local Cache Constants & Environment Check
+# ==============================================================================
+
+# OS temporary cache paths strictly outside the workspace to prevent repository clutter
+_LOCAL_STATE_CACHE: str = os.path.join(tempfile.gettempdir(), "gmail_agent_state_cache.json")
+_LOCAL_LOG_CACHE: str = os.path.join(tempfile.gettempdir(), "gmail_agent_run_log_cache.json")
 
 
 def _is_cloud_run() -> bool:
+    """
+    Checks if the current process is executing within Google Cloud Run.
+
+    Returns:
+        True if K_SERVICE is populated in the environment.
+    """
     return os.getenv("K_SERVICE") is not None
 
 
-def _ensure_bucket_exists(client: Any, bucket_name: str, project_id: Optional[str]) -> bool:
-    """Helper to check if bucket exists, attempting creation if permitted."""
+# ==============================================================================
+# SECTION 2: GCS Bucket Lifecycle Management
+# ==============================================================================
+
+def _ensure_bucket_exists(client: Any, bucket_name: str, project_id: str | None) -> bool:
+    """
+    Verifies GCS bucket existence and attempts creation if it does not yet exist.
+
+    Args:
+        client: Google Cloud Storage Client instance.
+        bucket_name: Canonical GCS bucket name.
+        project_id: Target GCP Project ID.
+
+    Returns:
+        True if the bucket exists or was created, False on failure.
+    """
     try:
         bucket = client.bucket(bucket_name)
         if not bucket.exists():
@@ -35,19 +83,34 @@ def _ensure_bucket_exists(client: Any, bucket_name: str, project_id: Optional[st
         return False
 
 
+# ==============================================================================
+# SECTION 3: Persistent State Operations
+# ==============================================================================
+
 def load_cloud_state(
-    bucket_name: Optional[str] = None,
-    blob_path: Optional[str] = None,
-) -> Dict[str, Any]:
+    bucket_name: str | None = None,
+    blob_path: str | None = None,
+) -> dict[str, Any]:
     """
-    Loads state dictionary from Google Cloud Storage with CLI fallback and OS temp cache fallback.
-    The Git repository root is NEVER polluted with state files.
+    Loads state dictionary from Google Cloud Storage with CLI and OS temp cache fallback.
+
+    Resolution Strategy:
+        1. Attempt GCS download via Python SDK or gcloud storage CLI.
+        2. Fall back to local OS temporary cache (`_LOCAL_STATE_CACHE`).
+        3. Return empty dictionary `{}` if no state has been created yet.
+
+    Args:
+        bucket_name: Optional custom bucket name (defaults to canonical project bucket).
+        blob_path: Optional custom blob path (defaults to 'gmail-agent/state.json').
+
+    Returns:
+        Dictionary representing the loaded state.
     """
     bucket = bucket_name or get_gcs_bucket_name()
     blob = blob_path or get_gcs_state_blob_path()
     is_cloud = _is_cloud_run()
 
-    def _try_sdk() -> Optional[Dict[str, Any]]:
+    def _try_sdk() -> dict[str, Any] | None:
         try:
             from google.cloud import storage
 
@@ -62,7 +125,7 @@ def load_cloud_state(
             pass
         return None
 
-    def _try_cli() -> Optional[Dict[str, Any]]:
+    def _try_cli() -> dict[str, Any] | None:
         try:
             is_win = sys.platform == "win32"
             cmd = ["gcloud", "storage", "cat", f"gs://{bucket}/{blob}"]
@@ -73,7 +136,7 @@ def load_cloud_state(
             pass
         return None
 
-    # Resolution order based on runtime environment
+    # Resolution order based on execution environment
     if is_cloud:
         res = _try_sdk() or _try_cli()
     else:
@@ -94,13 +157,24 @@ def load_cloud_state(
 
 
 def save_cloud_state(
-    data: Dict[str, Any],
-    bucket_name: Optional[str] = None,
-    blob_path: Optional[str] = None,
+    data: dict[str, Any],
+    bucket_name: str | None = None,
+    blob_path: str | None = None,
 ) -> bool:
     """
-    Saves state dictionary directly to GCS and OS temp cache.
-    Never writes state to workspace root.
+    Saves state dictionary directly to Google Cloud Storage and OS temp cache.
+
+    Guarantees:
+        - Never writes to the local Git workspace or project root.
+        - Preserves state across multi-PC migrations and Cloud Run invocations.
+
+    Args:
+        data: State dictionary to persist.
+        bucket_name: Optional custom GCS bucket name.
+        blob_path: Optional custom blob path.
+
+    Returns:
+        True if state was persisted to GCS, False if saved only to local temp cache.
     """
     bucket = bucket_name or get_gcs_bucket_name()
     blob = blob_path or get_gcs_state_blob_path()
@@ -143,12 +217,25 @@ def save_cloud_state(
         return _upload_cli() or _upload_sdk()
 
 
-def record_run_log(run_summary: Dict[str, Any], bucket_name: Optional[str] = None) -> bool:
+# ==============================================================================
+# SECTION 4: Operational Audit & Execution Logging
+# ==============================================================================
+
+def record_run_log(run_summary: dict[str, Any], bucket_name: str | None = None) -> bool:
     """
     Decoupled operational and audit log persistence.
-    1. Streams structured JSON log to stdout for Cloud Run / Cloud Logging ingestion.
-    2. Writes operational log to GCS at gs://<bucket>/<service>/run_log.json.
-    3. Keeps local fallback strictly in OS temp directory.
+
+    Dual-Channel Ingestion:
+        1. Emits structured JSON log to stdout (`[AUDIT_LOG]`) for Cloud Logging.
+        2. Writes operational audit entry to GCS at `gs://<bucket>/gmail-agent/run_log.json`.
+        3. Maintains a local fallback exclusively in the OS temporary directory.
+
+    Args:
+        run_summary: Summary dictionary detailing execution timestamp, stats, and errors.
+        bucket_name: Optional target GCS bucket name.
+
+    Returns:
+        True if log was uploaded to GCS, False if written to temp fallback only.
     """
     bucket = bucket_name or get_gcs_bucket_name()
     blob = get_gcs_log_blob_path()
@@ -166,7 +253,7 @@ def record_run_log(run_summary: Dict[str, Any], bucket_name: Optional[str] = Non
     # 1. Structured log to stdout (auto-collected by GCP Cloud Logging on Cloud Run)
     print(f"[AUDIT_LOG] {log_str}")
 
-    # 2. Safe OS temp fallback
+    # 2. Safe OS temp fallback (outside Git repository)
     try:
         with open(_LOCAL_LOG_CACHE, "w", encoding="utf-8") as f:
             f.write(log_str)
