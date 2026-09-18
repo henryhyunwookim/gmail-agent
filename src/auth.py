@@ -1,175 +1,240 @@
+import json
 import os
 import sys
-import json
+import tempfile
+from typing import Any, Dict, Optional
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-# If modifying these scopes, delete the file token.json.
+from src.config import get_project_id, resolve_cloud_secret
+
+# If modifying these scopes, update token in Secret Manager
 SCOPES = [
-    'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/gmail.send',
-    'https://www.googleapis.com/auth/gmail.modify'
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.modify",
 ]
 
-# Secret Manager configuration
-SECRET_NAME = "gmail-agent-token"
+# Secret Manager configuration keys
+TOKEN_SECRET_NAME = os.getenv("GMAIL_TOKEN_SECRET_NAME", "gmail-agent-token")
+CREDENTIALS_SECRET_NAME = os.getenv("GMAIL_CREDENTIALS_SECRET_NAME", "gmail-oauth-credentials")
+
+# Temp cache path to avoid workspace root pollution
+TEMP_TOKEN_CACHE = os.path.join(tempfile.gettempdir(), "gmail_agent_token.json")
 
 
-def _get_project_id():
-    """Get the GCP project ID from environment or metadata server."""
-    project_id = os.getenv("GCP_PROJECT_ID")
-    if project_id:
-        return project_id
-    # Fallback: on Cloud Run, query the metadata server
-    try:
-        import requests
-        resp = requests.get(
-            "http://metadata.google.internal/computeMetadata/v1/project/project-id",
-            headers={"Metadata-Flavor": "Google"},
-            timeout=2
-        )
-        if resp.status_code == 200:
-            return resp.text
-    except Exception:
-        pass
-    return None
-
-
-def _is_cloud_run():
+def _is_cloud_run() -> bool:
     """Check if running on Cloud Run."""
-    return os.getenv('K_SERVICE') is not None
+    return os.getenv("K_SERVICE") is not None
 
 
-def load_token_from_secret_manager():
-    """Load token.json content from Google Cloud Secret Manager."""
+def load_token_from_secret_manager() -> Optional[Dict[str, Any]]:
+    """
+    Load token content from Google Cloud Secret Manager using dual-mode resolution
+    (Python SDK first, falling back to gcloud CLI).
+    """
+    project_id = get_project_id()
+    if not project_id:
+        print("[AUTH] WARNING: Could not determine project ID for Secret Manager.")
+        return None
+
+    raw_secret = resolve_cloud_secret(TOKEN_SECRET_NAME, project_id)
+    if not raw_secret:
+        print(f"[AUTH] Secret '{TOKEN_SECRET_NAME}' not found in project '{project_id}'.")
+        return None
+
     try:
-        from google.cloud import secretmanager
-        project_id = _get_project_id()
-        if not project_id:
-            print("WARNING: Could not determine project ID for Secret Manager.")
-            return None
-
-        client = secretmanager.SecretManagerServiceClient()
-        name = f"projects/{project_id}/secrets/{SECRET_NAME}/versions/latest"
-        response = client.access_secret_version(request={"name": name})
-        token_data = response.payload.data.decode("UTF-8")
-        print("Successfully loaded token from Secret Manager.")
-        return json.loads(token_data)
+        token_data = json.loads(raw_secret)
+        print(f"[AUTH] Successfully resolved token from Secret Manager ('{TOKEN_SECRET_NAME}').")
+        return token_data
     except Exception as e:
-        print(f"Error loading token from Secret Manager: {e}")
+        print(f"[AUTH] Error parsing token JSON from Secret Manager: {e}")
         return None
 
 
-def save_token_to_secret_manager(creds):
-    """Save refreshed token back to Secret Manager as a new version."""
+def save_token_to_secret_manager(creds: Credentials) -> bool:
+    """Save refreshed or newly authorized token back to Secret Manager."""
+    project_id = get_project_id()
+    if not project_id:
+        print("[AUTH] WARNING: Could not determine project ID for Secret Manager.")
+        return False
+
+    token_json = creds.to_json()
+
+    # Method 1: Google Cloud Secret Manager SDK
     try:
         from google.cloud import secretmanager
-        project_id = _get_project_id()
-        if not project_id:
-            print("WARNING: Could not determine project ID for Secret Manager.")
-            return
 
         client = secretmanager.SecretManagerServiceClient()
-        parent = f"projects/{project_id}/secrets/{SECRET_NAME}"
-        token_json = creds.to_json()
-
+        parent = f"projects/{project_id}/secrets/{TOKEN_SECRET_NAME}"
         client.add_secret_version(
             request={
                 "parent": parent,
                 "payload": {"data": token_json.encode("UTF-8")},
             }
         )
-        print("Successfully saved refreshed token to Secret Manager.")
+        print(f"[AUTH] Successfully saved token to Secret Manager ('{TOKEN_SECRET_NAME}').")
+        return True
+    except Exception:
+        pass
+
+    # Method 2: gcloud CLI fallback
+    try:
+        import subprocess
+        is_win = sys.platform == "win32"
+        # Write to temporary file for gcloud CLI input
+        with open(TEMP_TOKEN_CACHE, "w", encoding="utf-8") as f:
+            f.write(token_json)
+        cmd = [
+            "gcloud",
+            "secrets",
+            "versions",
+            "add",
+            TOKEN_SECRET_NAME,
+            f"--data-file={TEMP_TOKEN_CACHE}",
+            f"--project={project_id}",
+        ]
+        subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=15, shell=is_win)
+        print(f"[AUTH] Successfully uploaded token to Secret Manager via gcloud CLI.")
+        return True
     except Exception as e:
-        print(f"Error saving token to Secret Manager: {e}")
+        print(f"[AUTH] Failed to save token to Secret Manager: {e}")
+        return False
 
 
-def authenticate_gmail(force_interactive=False):
-    """Authenticates with Gmail API.
+def load_credentials_config() -> Optional[Dict[str, Any]]:
+    """
+    Loads OAuth client secrets config from local file, OS temp cache, or Secret Manager.
+    """
+    # 1. Local workspace file if explicitly present
+    if os.path.exists("credentials.json"):
+        try:
+            with open("credentials.json", "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+
+    # 2. Secret Manager resolution
+    project_id = get_project_id()
+    if project_id:
+        raw_creds = resolve_cloud_secret(CREDENTIALS_SECRET_NAME, project_id)
+        if raw_creds:
+            try:
+                return json.loads(raw_creds)
+            except Exception:
+                pass
+
+    return None
+
+
+def authenticate_gmail(force_interactive: bool = False) -> Credentials:
+    """
+    Universal Gmail API authentication for ANY machine (local PC, laptop, or Cloud Run).
+    Resolution priority:
+      1. Local token.json (if explicitly placed)
+      2. OS temp directory token cache
+      3. Google Cloud Secret Manager ('gmail-agent-token')
     
-    On Cloud Run: loads token from Secret Manager, refreshes in-memory if needed.
-    Locally: uses token.json file as before.
+    If token is expired:
+      Refreshes in-memory and updates temp cache (workspace root is kept clean).
+    
+    If interactive login is required:
+      Downloads client credentials from Secret Manager in-memory and opens browser.
     """
     creds = None
     on_cloud_run = _is_cloud_run()
 
-    # --- Load existing credentials ---
-    if on_cloud_run and not force_interactive:
-        # Cloud Run: load from Secret Manager
-        token_data = load_token_from_secret_manager()
-        if token_data:
+    # --- 1. Load existing credentials ---
+    if not force_interactive:
+        # Check local file
+        if os.path.exists("token.json"):
             try:
-                creds = Credentials.from_authorized_user_info(token_data, SCOPES)
+                creds = Credentials.from_authorized_user_file("token.json", SCOPES)
             except Exception as e:
-                print(f"Error parsing token from Secret Manager: {e}")
+                print(f"[AUTH] Error loading local token.json: {e}")
                 creds = None
-    elif os.path.exists('token.json') and not force_interactive:
-        # Local: load from file
-        try:
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-        except Exception as e:
-            print(f"Error loading token.json: {e}")
-            creds = None
 
-    # --- Refresh or re-authenticate ---
+        # Check OS temp cache
+        if not creds and os.path.exists(TEMP_TOKEN_CACHE):
+            try:
+                creds = Credentials.from_authorized_user_file(TEMP_TOKEN_CACHE)
+            except Exception:
+                creds = None
+
+        # Check Secret Manager
+        if not creds:
+            token_data = load_token_from_secret_manager()
+            if token_data:
+                try:
+                    token_scopes = token_data.get("scopes") or SCOPES
+                    creds = Credentials.from_authorized_user_info(token_data, scopes=token_scopes)
+                except Exception as e:
+                    print(f"[AUTH] Error parsing token from Secret Manager: {e}")
+                    creds = None
+
+    # --- 2. Refresh or re-authenticate ---
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
-                print("Attempting to refresh access token...")
+                print("[AUTH] Attempting in-memory token refresh...")
                 creds.refresh(Request())
-                # Local: save refreshed token to disk
-                # Cloud Run: refreshed in-memory only (avoids creating unneeded billable secret versions)
-                if not on_cloud_run:
-                    with open('token.json', 'w') as token:
-                        token.write(creds.to_json())
-                        print("Saved refreshed token to token.json.")
+                print("[AUTH] Access token refreshed successfully.")
+                # Save refreshed token to OS temp cache only (never polluting workspace)
+                try:
+                    with open(TEMP_TOKEN_CACHE, "w", encoding="utf-8") as f:
+                        f.write(creds.to_json())
+                except Exception:
+                    pass
             except Exception as e:
-                print(f"Error refreshing token: {e}")
+                print(f"[AUTH] Error refreshing token: {e}")
                 creds = None
-        
+
         if not creds:
-            # Determine if we can do interactive auth
             is_interactive = sys.stdin and sys.stdin.isatty()
-            
             if (not is_interactive or on_cloud_run) and not force_interactive:
                 raise RuntimeError(
-                    "\n" + "="*80 + "\n"
-                    "GMAIL AGENT AUTHENTICATION ERROR: Token has expired and cannot be refreshed automatically.\n"
+                    "\n" + "=" * 80 + "\n"
+                    "GMAIL AGENT AUTHENTICATION ERROR: Token has expired or is missing.\n"
                     "\n"
-                    "TO FIX (no redeployment needed):\n"
-                    "1. On your local machine, run: python src/auth.py\n"
-                    "2. Complete the browser login flow.\n"
-                    "3. Upload the new token:  .\\deployment\\upload_token.ps1\n"
-                    "\n"
-                    "The Cloud Run service will automatically pick up the new token on the next run.\n"
-                    + "="*80 + "\n"
+                    "TO FIX (Zero-Setup / Multi-PC):\n"
+                    "1. Ensure 'gcloud auth login' and 'gcloud config set project <PROJECT_ID>' are done.\n"
+                    "2. Run: python -m src.auth\n"
+                    "3. Complete browser login flow. The token will be saved to Secret Manager automatically.\n"
+                    + "=" * 80 + "\n"
                 )
-            
-            if not os.path.exists('credentials.json'):
-                raise FileNotFoundError("credentials.json not found. Please download it from Google Cloud Console and place it in the project root directory.")
-            
-            print("Starting local server for interactive authentication...")
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+
+            client_config = load_credentials_config()
+            if not client_config:
+                raise FileNotFoundError(
+                    "OAuth client credentials not found in 'credentials.json' or Secret Manager "
+                    f"('{CREDENTIALS_SECRET_NAME}'). Please configure it or run sync_secrets utility."
+                )
+
+            print("[AUTH] Starting local server for interactive authentication...")
+            flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
             creds = flow.run_local_server(port=0)
-            
-            # Save the credentials
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
-                print("Successfully authenticated and saved token.json!")
+
+            # Save newly obtained token to temp cache and Secret Manager
+            try:
+                with open(TEMP_TOKEN_CACHE, "w", encoding="utf-8") as f:
+                    f.write(creds.to_json())
+            except Exception:
+                pass
+
+            save_token_to_secret_manager(creds)
+            print("[AUTH] Authentication complete! Token synchronized to Cloud Secret Manager.")
 
     return creds
+
 
 if __name__ == "__main__":
     print("Gmail Agent - Interactive Re-authentication Tool")
     print("=" * 50)
     try:
         authenticate_gmail(force_interactive=True)
-        print("Success! token.json has been generated/updated.")
-        print()
-        print("Next step: upload the token to Secret Manager:")
-        print("  .\\deployment\\upload_token.ps1")
+        print("\nSuccess! Token has been generated and synchronized to Secret Manager.")
     except Exception as err:
         print(f"\nAuthentication failed: {err}")
         sys.exit(1)

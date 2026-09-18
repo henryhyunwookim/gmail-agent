@@ -22,18 +22,25 @@ def run_agent():
             except ValueError:
                 pass
 
-        # Check JSON payload if provided
-        if max_results is None and request.is_json:
-            data = request.get_json(silent=True) or {}
-            val = data.get("max_emails") or data.get("max_results")
-            if val is not None:
-                try:
-                    max_results = int(val)
-                except (ValueError, TypeError):
-                    pass
+        dry_run = False
+        if request.args.get("dry_run"):
+            dry_run = request.args.get("dry_run").lower() in ("true", "1", "yes")
 
-        print(f"Received trigger request. Starting agent (max_results={max_results})...")
-        result = main(max_results=max_results)
+        # Check JSON payload if provided
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+            if max_results is None:
+                val = data.get("max_emails") or data.get("max_results")
+                if val is not None:
+                    try:
+                        max_results = int(val)
+                    except (ValueError, TypeError):
+                        pass
+            if not dry_run and "dry_run" in data:
+                dry_run = bool(data["dry_run"])
+
+        print(f"Received trigger request. Starting agent (max_results={max_results}, dry_run={dry_run})...")
+        result = main(max_results=max_results, dry_run=dry_run)
         
         if result and result.get('success'):
             return jsonify({

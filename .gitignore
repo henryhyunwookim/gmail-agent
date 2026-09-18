@@ -45,3 +45,9 @@ htmlcov/
 notebookLM/
 promo_materials/
 digest_output/
+
+# Cloud state and ephemeral caches
+*.json.bak
+state.json
+run_log.json
+*.tmp

@@ -16,48 +16,58 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 ## Architecture
 
-The system is designed as a cloud-native application running on **Google Cloud Platform (GCP)**, leveraging **Google Gemini 3.8 Flash** for high-speed, cost-effective AI analysis.
+The system is designed as a fully cloud-native, multi-PC portable application running on **Google Cloud Platform (GCP)**, leveraging **Google Cloud Secret Manager**, **Google Cloud Storage (GCS)**, and **Google Gemini 3.8 Flash** for high-speed, secure, and zero-setup execution across any machine or Cloud Run.
 
 ![Gmail Agent Architecture & Workflow Overview](docs/assets/architecture_overview.png)
 
 ```mermaid
 graph TD
+    subgraph Multi-PC Resolution Layer
+        GCPAuth[gcloud auth login / ADC] --> SecretMgr[Secret Manager]
+        SecretMgr -->|gemini-api-key| Config[src/config.py]
+        SecretMgr -->|gmail-agent-token| Auth[src/auth.py]
+        SecretMgr -->|gmail-oauth-credentials| Auth
+    end
+
     subgraph Google Cloud Platform
         Scheduler[Cloud Scheduler] -->|Trigger via Configured Cron| CloudRun[Cloud Run Service]
         CloudRun -->|Runs| App[Flask App]
         App -->|Executes| Main[Main Logic]
-    end
-
-    subgraph External Services
-        GmailAPI[Gmail API]
-        GeminiAPI[Google Gemini API]
+        Main -->|Operational Logs| GCS[Cloud Storage gs://...-gmail-agent-data]
+        Main -->|Structured Logs| CloudLogging[GCP Cloud Logging]
     end
 
     subgraph Application Logic
         Main -->|Auth & Fetch| GmailClient[Gmail Client]
         Main -->|Analyze| Summarizer[AI Summarizer]
-        
-        %% Data Flow
         Summarizer -.->|Summary & Actions| GmailClient
         GmailClient -.->|Email Content| Summarizer
-
-        Summarizer -->|Generate Content| GeminiAPI
-        GmailClient -->|Send Summaries| GmailAPI
+        Summarizer -->|Generate Content| GeminiAPI[Gemini 3.8 Flash]
+        GmailClient -->|Send Summaries| GmailAPI[Gmail API]
         GmailClient -->|Apply Labels| GmailAPI
-        GmailClient -->|Read Emails| GmailAPI
     end
 
     GmailAPI -->|Delivers Summary| User((User))
 ```
 
+### Multi-PC Cloud Architecture Strategy
+
+| Layer | Target Cloud Service | Purpose & Storage Format | Multi-PC Resolution Strategy |
+| :--- | :--- | :--- | :--- |
+| **API Keys & Secrets** (`GEMINI_API_KEY`) | **Google Cloud Secret Manager** | Secure string (`secrets/gemini-api-key`) | Dual-mode: Python SDK with fallback to authenticated `gcloud secrets versions access` CLI |
+| **OAuth Tokens** (`token.json`) | **Google Cloud Secret Manager** | Serialized JSON token (`secrets/gmail-agent-token`) | Auto-resolved when local file is missing; in-memory refresh with OS temp cache fallback |
+| **OAuth Client IDs** (`credentials.json`) | **Google Cloud Secret Manager** | Raw client secrets JSON (`secrets/gmail-oauth-credentials`) | Auto-downloaded in-memory on demand if interactive web browser login is triggered |
+| **Persistent State** (`state.json`) | **Google Cloud Storage (GCS)** | `gs://<bucket>/gmail-agent/state.json` | Single source of truth; local runs write fallbacks only to OS temp dir (`tempfile.gettempdir()`) |
+| **Operational & Audit Logs** (`run_log.json`) | **Google Cloud Storage & Cloud Logging** | `gs://<bucket>/gmail-agent/run_log.json` + `stdout` | Decoupled from state; streamed to Cloud Logging on Cloud Run and GCS |
+
 ### System Components
 
-*   **Cloud Scheduler**: The configurable "alarm clock" that triggers the system according to your custom cron schedule (defaults to twice daily at 5:00 AM/PM, fully customizable via `.env`).
-*   **Cloud Run**: The serverless compute environment that hosts and executes the agent container.
-*   **Gmail Client**: The internal Python module that handles authentication, fetches emails, and constructs the summary emails.
-*   **AI Summarizer**: The intelligence layer that prepares prompts for Gemini and interprets the structured JSON response.
-*   **Gmail API**: Google's external service that stores your emails and physically delivers the summaries to your inbox.
-*   **Gemini API**: Google's LLM service (Gemini 3.8 Flash) that performs the text analysis and summarization.
+*   **Cloud Secret Manager**: Canonical vault storing `gemini-api-key`, `gmail-agent-token`, and `gmail-oauth-credentials`. Allows zero-setup execution on any computer.
+*   **Cloud Storage (GCS)**: Stores decoupled execution logs (`run_log.json`) and agent state without polluting local git workspaces.
+*   **Cloud Scheduler**: The configurable "alarm clock" that triggers the system according to your custom cron schedule.
+*   **Cloud Run**: The serverless container compute environment hosting the agent container.
+*   **Gmail Client**: The internal Python module that handles authentication, fetches unread emails, and constructs forwarded summaries.
+*   **AI Summarizer**: The intelligence layer that analyzes emails with Gemini 3.8 Flash.
 
 ### Logic Flow
 
@@ -335,36 +345,57 @@ purchase_keywords = [
 ]
 ```
 
+## Multi-PC Zero-Setup Execution
+
+In this cloud-native architecture, any newly cloned machine with `gcloud` access can execute immediately with **zero local credential files** or `.env` required.
+
+```powershell
+# 1. Authenticate with Google Cloud
+gcloud auth login
+gcloud config set project gen-lang-client-0480639565
+
+# 2. Run immediately in Dry-Run mode (zero files created on disk)
+python -m src.main --dry-run --max-emails 2
+
+# 3. Normal execution
+python -m src.main --max-emails 20
+```
+
+### Initial Credential Synchronization (One-Time Setup)
+
+If you generate or obtain new local credentials and need to seed Secret Manager:
+
+```powershell
+# Sync token.json, credentials.json, and GEMINI_API_KEY to Secret Manager in one shot
+python sync_secrets.py
+```
+
 ## Project Structure
 
 ```
 gmail-agent/
 ├── deployment/
-│   ├── .env.example        # Template for environment variables
+│   ├── .env.example        # Reference template for cloud variables (optional locally)
 │   ├── DEPLOYMENT.md       # Detailed deployment guide
-│   └── deploy_cloud.ps1    # Cloud deployment script
+│   ├── deploy_cloud.ps1    # Cloud deployment script (Cloud Run + Scheduler)
+│   ├── sync_secrets.py     # Tool to sync local credentials to Secret Manager
+│   └── upload_token.ps1    # Token upload utility
 ├── docs/
 │   └── assets/             # Architecture overview & documentation assets
 ├── src/
 │   ├── app.py              # Flask web server for Cloud Run
-│   ├── auth.py             # Gmail authentication
-│   ├── config.py           # Centralized configuration & defaults
+│   ├── auth.py             # Dual-mode multi-PC Gmail authentication
+│   ├── config.py           # Centralized configuration & Secret Manager resolution
 │   ├── gmail_client.py     # Gmail API client
-│   ├── main.py             # Main application logic
-│   └── summarizer.py       # AI summarization logic
-├── tests/
-│   ├── debug_run.py        # Debugging / verification utility
-│   ├── list_models.py      # Utility to list available Gemini models
-│   └── test_summarizer.py  # Summarizer unit tests
+│   ├── main.py             # Main application logic & CLI runner
+│   ├── storage.py          # Google Cloud Storage state & decoupled run logging
+│   └── summarizer.py       # AI summarization logic (Gemini 3.8 Flash)
+├── sync_secrets.py         # Convenience CLI entry point for secret synchronization
 ├── Dockerfile              # Container configuration
 ├── LICENSE                 # Project license
 ├── README.md               # Project documentation
-├── requirements.txt        # Python dependencies
-├── run_agent.bat           # Windows executable helper
-├── credentials.json        # Gmail OAuth credentials (not in repo)
-├── token.json              # Gmail auth token (not in repo)
-├── notebookLM/             # Generated media assets (ignored in .gitignore)
-└── .env                    # Environment variables (not in repo)
+├── requirements.txt        # Python dependencies (includes cloud secret & storage SDKs)
+└── run_agent.bat           # Windows executable helper
 ```
 
 ## Cost Estimate

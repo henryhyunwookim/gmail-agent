@@ -1,25 +1,23 @@
 # Gmail Agent - Cloud Deployment Script
 
-# Load configuration from .env file
-if (-not (Test-Path ".env")) {
-    Write-Error ".env file not found. Please create it with required variables."
-    Write-Host "Required variables in .env:"
-    Write-Host "  GCP_PROJECT_ID=your-project-id"
-    exit 1
-}
-
-# Read .env file and set variables
-Get-Content .env | ForEach-Object {
-    if ($_ -match '^\s*([^#][^=]*)\s*=\s*(.*)$') {
-        $name = $matches[1].Trim()
-        $value = $matches[2].Trim()
-        Set-Variable -Name $name -Value $value -Scope Script
+# Load configuration from .env file if present
+if (Test-Path ".env") {
+    Get-Content .env | ForEach-Object {
+        if ($_ -match '^\s*([^#][^=]*)\s*=\s*(.*)$') {
+            $name = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            Set-Variable -Name $name -Value $value -Scope Script
+        }
     }
 }
 
-# Configuration (can be overridden in .env)
+# Resolve project ID from env or gcloud CLI
 if (-not $GCP_PROJECT_ID) {
-    Write-Error "GCP_PROJECT_ID not set in .env file"
+    $GCP_PROJECT_ID = (gcloud config get-value project 2>$null).Trim()
+}
+
+if (-not $GCP_PROJECT_ID -or $GCP_PROJECT_ID -eq "(unset)") {
+    Write-Error "GCP_PROJECT_ID not set in .env and no active gcloud project found. Run 'gcloud config set project <ID>'."
     exit 1
 }
 
@@ -51,15 +49,15 @@ Write-Host "Setting project to $PROJECT_ID..."
 gcloud config set project $PROJECT_ID
 
 # 3. Enable required services
-Write-Host "Enabling required APIs (Cloud Run, Cloud Build, Artifact Registry, Cloud Scheduler)..."
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com cloudscheduler.googleapis.com
+Write-Host "Enabling required APIs (Cloud Run, Cloud Build, Artifact Registry, Cloud Scheduler, Secret Manager, Cloud Storage)..."
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com cloudscheduler.googleapis.com secretmanager.googleapis.com storage.googleapis.com
 
 # 4. Deploy to Cloud Run
 Write-Host "Deploying to Cloud Run..."
 gcloud run deploy $SERVICE_NAME `
     --source . `
     --region $REGION `
-    --set-env-vars "MAX_EMAILS=$MAX_EMAILS,SCHEDULE=$SCHEDULE,TIMEZONE=$TIMEZONE" `
+    --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID,MAX_EMAILS=$MAX_EMAILS" `
     --no-allow-unauthenticated `
     --quiet
 
