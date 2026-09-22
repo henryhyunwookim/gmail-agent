@@ -11,7 +11,7 @@
     The Google Cloud Project ID to deploy to. Defaults to $GCP_PROJECT_ID from .env or active gcloud config.
 
 .PARAMETER Region
-    The Google Cloud Region (e.g. 'us-central1'). Defaults to $GCP_REGION from .env or 'us-central1'.
+    The Google Cloud Region (e.g. 'asia-northeast1'). Defaults to $GCP_REGION from .env or 'asia-northeast1'.
 
 .PARAMETER ServiceName
     The Cloud Run service name. Defaults to 'gmail-agent'.
@@ -98,7 +98,7 @@ $CONFIG_DEFAULTS = try {
     $null
 }
 
-$TARGET_REGION = if ($Region) { $Region } elseif ($GCP_REGION) { $GCP_REGION } else { "us-central1" }
+$TARGET_REGION = if ($Region) { $Region } elseif ($GCP_REGION) { $GCP_REGION } else { "asia-northeast1" }
 $TARGET_SERVICE = if ($ServiceName) { $ServiceName } elseif ($SERVICE_NAME) { $SERVICE_NAME } else { "gmail-agent" }
 $TARGET_JOB = if ($JobName) { $JobName } elseif ($JOB_NAME) { $JOB_NAME } else { "gmail-agent-daily-trigger" }
 $TARGET_SCHEDULE = if ($Schedule) { $Schedule } elseif ($SCHEDULE) { $SCHEDULE } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.schedule) { $CONFIG_DEFAULTS.schedule } else { "0 5,17 * * *" }

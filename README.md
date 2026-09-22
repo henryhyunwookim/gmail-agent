@@ -197,7 +197,7 @@ MAX_EMAILS=20
 
 # GCP Configuration (needed for cloud deployment)
 GCP_PROJECT_ID=your-gcp-project-id
-GCP_REGION=us-central1
+GCP_REGION=asia-northeast1
 SERVICE_NAME=gmail-agent
 JOB_NAME=gmail-agent-daily-trigger
 SCHEDULE=0 5,17 * * *
@@ -259,7 +259,7 @@ This will:
 .\deployment\deploy_cloud.ps1
 
 # Or with explicit parameters:
-.\deployment\deploy_cloud.ps1 -ProjectId "YOUR_PROJECT_ID" -Region "us-central1" -Schedule "0 5,17 * * *"
+.\deployment\deploy_cloud.ps1 -ProjectId "YOUR_PROJECT_ID" -Region "asia-northeast1" -Schedule "0 5,17 * * *"
 ```
 
 The script will:
@@ -272,13 +272,13 @@ The script will:
 Check the logs:
 
 ```powershell
-gcloud run services logs read gmail-agent --region=us-central1 --limit=10
+gcloud run services logs read gmail-agent --region=asia-northeast1 --limit=10
 ```
 
 Or manually trigger:
 
 ```powershell
-gcloud scheduler jobs run gmail-agent-daily-trigger --location=us-central1
+gcloud scheduler jobs run gmail-agent-daily-trigger --location=asia-northeast1
 ```
 
 ## Configuration
