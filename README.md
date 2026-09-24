@@ -294,7 +294,7 @@ Run the deployment script:
 .\deployment\deploy_cloud.ps1
 
 # Or with explicit parameters:
-.\deployment\deploy_cloud.ps1 -ProjectId "gen-lang-client-0480639565" -Region "asia-northeast1" -Schedule "0 5,17 * * *"
+.\deployment\deploy_cloud.ps1 -ProjectId "<your-gcp-project-id>" -Region "asia-northeast1" -Schedule "0 5,17 * * *"
 ```
 
 The script will:
@@ -418,7 +418,7 @@ In this cloud-native architecture, any newly cloned machine with `gcloud` access
 ```powershell
 # 1. Authenticate with Google Cloud
 gcloud auth login
-gcloud config set project gen-lang-client-0480639565
+gcloud config set project <your-gcp-project-id>
 
 # 2. Run immediately in Dry-Run mode (zero files created on disk)
 python -m src.main --dry-run --max-emails 2
