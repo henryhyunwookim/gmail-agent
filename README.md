@@ -98,54 +98,73 @@ The application follows a linear execution pipeline, optimized for batch process
 Here's how an incoming email looks when processed by the agent:
 
 **Original Email:**
-> **From:** Sarah Jones (via Project Alpha Updates) <<sarah.jones@example.com>><br>
-> **Subject:** Project Alpha Update & Q4 Planning<br>
-> **Body:** Hi everyone, quick update on Project Alpha. The backend API is finally complete and all tests are passing! However, we're hitting some snags with the frontend integration—specifically around the new auth flow. We likely need another 2 days to iron that out. Also, we really need to lock down the Q4 roadmap. Can we meet next Tuesday at 2 PM to go over the proposed features? Let me know if that works.<br>
->
-> [You are receiving this because you are subscribed to Project Alpha Updates. Unsubscribe]
+
+```email
+From: Sarah Jones (via Project Alpha Updates) <sarah.jones@example.com>
+Subject: Project Alpha Update & Q4 Planning
+
+Hi everyone, quick update on Project Alpha. The backend API is finally complete 
+and all tests are passing! However, we're hitting some snags with the frontend 
+integration—specifically around the new auth flow. We likely need another 2 days 
+to iron that out. Also, we really need to lock down the Q4 roadmap. Can we meet 
+next Tuesday at 2 PM to go over the proposed features? Let me know if that works.
+
+[You are receiving this because you are subscribed to Project Alpha Updates. Unsubscribe]
+```
 
 **Agent's Executive Intelligence Briefing:**
-> ================================================================================<br>
-> 📰 **EXECUTIVE INTELLIGENCE BRIEFING**<br>
-> ================================================================================<br>
-> 📌 **Subject:** Project Alpha Update & Q4 Planning<br>
-> 👤 **Sender:** Sarah Jones (via Project Alpha Updates) <<sarah.jones@example.com>><br>
-> <br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> 💡 **EXECUTIVE SUMMARY & CONTEXT**<br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> Sarah Jones reports that the backend API for Project Alpha has achieved full test coverage and reached production completion. However, client-side rollout is experiencing a brief 48-hour delay stemming from OAuth token refresh edge-cases in the new authentication flow. In parallel, team leadership is finalizing the Q4 engineering roadmap to prioritize incoming feature requests.<br>
-> <br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> 🔍 **DEEP-DIVE KEY INSIGHTS**<br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> • [Backend Architecture]: Core REST endpoints are fully deployed with automated CI test suites passing.<br>
-> • [Frontend Auth Bottleneck]: Integration roadblock isolated to state synchronization in the revised OAuth flow; estimated resolution within 2 working days.<br>
-> • [Q4 Milestone Scheduling]: Team planning session proposed for Tuesday at 2:00 PM to lock down quarterly feature delivery commitments.<br>
-> <br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> 🌐 **EXTERNAL SOURCE INSIGHTS (Full Article / Video / Audio)**<br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> Video demo demonstrates the new multi-tenant auth architecture and interactive dashboard prototype.<br>
-> <br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> ⚡ **ACTIONABLE TAKEAWAYS**<br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> • Confirm availability for the Q4 planning meeting on Tuesday at 2:00 PM.<br>
-> • Review frontend auth branch PR before Wednesday's scheduled merge window.<br>
-> <br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> 🎯 **ACTION STATUS**<br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> **Action Required**: YES ⚠️<br>
-> **Reason**: Needs calendar confirmation for the proposed planning meeting time.<br>
-> <br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> 🔗 **REFERENCED SOURCES & LINKS**<br>
-> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-> • [YOUTUBE] Project Alpha Walkthrough: https://youtube.com/watch?v=...<br>
-> • [UNSUBSCRIBE] https://example.com/unsubscribe<br>
-> ================================================================================
+
+```text
+================================================================================
+📰 EXECUTIVE INTELLIGENCE BRIEFING
+================================================================================
+📌 Subject: Project Alpha Update & Q4 Planning
+👤 Sender:  Sarah Jones (via Project Alpha Updates) <sarah.jones@example.com>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 EXECUTIVE SUMMARY & CONTEXT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sarah Jones reports that the backend API for Project Alpha has achieved full 
+test coverage and reached production completion. However, client-side rollout is 
+experiencing a brief 48-hour delay stemming from OAuth token refresh edge-cases 
+in the new authentication flow. In parallel, team leadership is finalizing the 
+Q4 engineering roadmap to prioritize incoming feature requests.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 DEEP-DIVE KEY INSIGHTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• [Backend Architecture]: Core REST endpoints are fully deployed with automated 
+  CI test suites passing.
+• [Frontend Auth Bottleneck]: Integration roadblock isolated to state 
+  synchronization in the revised OAuth flow; estimated resolution within 2 working days.
+• [Q4 Milestone Scheduling]: Team planning session proposed for Tuesday at 
+  2:00 PM to lock down quarterly feature delivery commitments.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 EXTERNAL SOURCE INSIGHTS (Full Article / Video / Audio)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Video demo demonstrates the new multi-tenant auth architecture and interactive 
+dashboard prototype.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ ACTIONABLE TAKEAWAYS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Confirm availability for the Q4 planning meeting on Tuesday at 2:00 PM.
+• Review frontend auth branch PR before Wednesday's scheduled merge window.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 ACTION STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Action Required: YES ⚠️
+Reason: Needs calendar confirmation for the proposed planning meeting time.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔗 REFERENCED SOURCES & LINKS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• [YOUTUBE] Project Alpha Walkthrough: https://youtube.com/watch?v=...
+• [UNSUBSCRIBE] https://example.com/unsubscribe
+================================================================================
+```
 
 ## 🎨 Personalization Showcase
 
