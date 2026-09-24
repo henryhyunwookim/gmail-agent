@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 import time
 from datetime import datetime
 from typing import Any, Optional
@@ -73,6 +74,16 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
     """
     load_dotenv()
 
+    # Ensure UTF-8 console output on Windows to prevent UnicodeEncodeError
+    if sys.platform == "win32":
+        try:
+            if hasattr(sys.stdout, "reconfigure"):
+                sys.stdout.reconfigure(encoding="utf-8")
+            if hasattr(sys.stderr, "reconfigure"):
+                sys.stderr.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     # Stage 1: Resolve batch limit via centralized configuration
     max_results = get_max_emails(max_results)
 
@@ -84,6 +95,7 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
         "purchase": 0,
         "already_summarized": 0,
         "processed": 0,
+        "external_sources_fetched": 0,
         "dry_run": dry_run,
     }
 
@@ -164,68 +176,133 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                 is_ftchinese = sender_email.lower().endswith("newsletter.ftchinese.com")
                 analysis = summarizer.summarize(content, include_translation=is_ftchinese)
 
-                if is_ftchinese:
-                    print(f"Action Required: {analysis.get('action_required', False)}")
-                else:
-                    print(f"Summary: {analysis.get('summary', 'No summary provided')}")
-                    print(f"Action Required: {analysis.get('action_required', False)}")
+                ext_sources = analysis.get("external_sources", [])
+                stats["external_sources_fetched"] += len(ext_sources)
 
-                # Stage 6: Construct Forwarding Content
-                unsubscribe_section = ""
-                if analysis.get("unsubscribe_link"):
-                    unsubscribe_section = f"\n\nUnsubscribe Link: {analysis['unsubscribe_link']}\n"
+                exec_summary = analysis.get("executive_summary") or analysis.get("summary", "No summary provided.")
+                print(f"Executive Summary: {exec_summary[:120]}...")
+                print(f"Action Required: {analysis.get('action_required', False)}")
+                if ext_sources:
+                    print(f"External Sources Ingested: {len(ext_sources)}")
 
+                # Stage 6: Construct Rich Executive Intelligence Briefing
+                # 6a: Deep-Dive Key Insights
                 insights_section = ""
-                if not is_ftchinese and analysis.get("sections") and len(analysis["sections"]) > 0:
-                    insights_section = "\n\nInsights:\n"
-                    for section in analysis["sections"]:
-                        topic = section.get("topic", "Unknown")
-                        insight = section.get("insight", "No insight provided")
-                        insights_section += f"• {topic}: {insight}\n"
+                key_insights = analysis.get("key_insights") or []
+                if not key_insights and analysis.get("sections"):
+                    key_insights = [
+                        {"topic": s.get("topic", "Insight"), "details": s.get("insight", "")}
+                        for s in analysis.get("sections", [])
+                    ]
 
+                if key_insights:
+                    insights_lines = []
+                    for ki in key_insights:
+                        topic = ki.get("topic", "Theme")
+                        details = ki.get("details", "")
+                        insights_lines.append(f"• [{topic}]\n  {details}")
+                    insights_section = (
+                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "🔍 DEEP-DIVE KEY INSIGHTS\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "\n\n".join(insights_lines)
+                    )
+
+                # 6b: External Source Highlights (Articles, YouTube, Podcasts)
+                external_highlights_section = ""
+                ext_highlights = analysis.get("external_source_highlights")
+                if ext_highlights and ext_highlights.strip() and ext_highlights.lower() != "null":
+                    external_highlights_section = (
+                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "🌐 EXTERNAL SOURCE INSIGHTS (Full Article / Video / Audio)\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        f"{ext_highlights.strip()}"
+                    )
+
+                # 6c: Actionable Takeaways & Next Steps
+                takeaways_section = ""
+                takeaways = analysis.get("actionable_takeaways") or []
+                if takeaways:
+                    takeaways_lines = [f"• {t}" for t in takeaways]
+                    takeaways_section = (
+                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "⚡ ACTIONABLE TAKEAWAYS\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "\n".join(takeaways_lines)
+                    )
+
+                # 6d: Chinese Study Corner (for FTChinese)
                 translation_section = ""
                 if is_ftchinese and analysis.get("learning_segments"):
-                    translation_section = "\n\n=== CHINESE STUDY CORNER ===\n"
+                    translation_section = (
+                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "📚 CHINESE STUDY CORNER\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    )
                     for i, segment in enumerate(analysis["learning_segments"], 1):
-                        if i == 4:
+                        if i > 5:
                             break
                         translation_section += f"\n[Sentence {i}]\n"
-                        translation_section += f"Original: {segment.get('original', '')}\n\n"
-                        translation_section += f"Pinyin:   {segment.get('pinyin', '')}\n\n"
-                        translation_section += f"English:  {segment.get('translation', '')}\n\n"
+                        translation_section += f"Original:    {segment.get('original', '')}\n"
+                        translation_section += f"Pinyin:      {segment.get('pinyin', '')}\n"
+                        translation_section += f"Translation: {segment.get('translation', '')}\n"
                         if segment.get("vocabulary"):
                             translation_section += "Vocabulary:\n"
                             for vocab in segment["vocabulary"]:
-                                translation_section += f"  • {vocab.get('word', '')}: {vocab.get('pinyin', '')} - {vocab.get('english', '')}\n"
-                            translation_section += "\n"
-                    translation_section += "\n=============================\n"
+                                translation_section += (
+                                    f"  • {vocab.get('word', '')}: {vocab.get('pinyin', '')} - {vocab.get('english', '')}\n"
+                                )
 
-                if is_ftchinese:
-                    summary_text = f"""
-=== EMAIL SUMMARY ===
+                # 6e: Referenced External Sources & Unsubscribe Links
+                sources_section = ""
+                src_lines = []
+                for src in ext_sources:
+                    src_title = src.get("title", "")
+                    src_url = src.get("url", "")
+                    src_type = src.get("type", "link").upper()
+                    if src_title:
+                        src_lines.append(f"• [{src_type}] {src_title}: {src_url}")
+                    else:
+                        src_lines.append(f"• [{src_type}] {src_url}")
 
-Original Sender: {content.get('sender')}
-Subject: {content.get('subject')}{translation_section}
-Action Required: {'YES' if analysis.get('action_required', False) else 'NO'}
-Reason: {analysis.get('reason', 'None')}{unsubscribe_section}
-========================
-"""
-                else:
-                    summary_text = f"""
-=== EMAIL SUMMARY ===
+                if analysis.get("unsubscribe_link"):
+                    src_lines.append(f"• [UNSUBSCRIBE] {analysis['unsubscribe_link']}")
 
-Original Sender: {content.get('sender')}
-Subject: {content.get('subject')}
+                if src_lines:
+                    sources_section = (
+                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        "🔗 REFERENCED SOURCES & LINKS\n"
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                        + "\n".join(src_lines)
+                    )
 
-Summary:
-{analysis.get('summary', 'No summary provided')}{insights_section}
-Action Required: {'YES' if analysis.get('action_required', False) else 'NO'}
-Reason: {analysis.get('reason', 'None')}{unsubscribe_section}
-========================
+                # 6f: Action Status Block
+                action_status = "YES ⚠️" if analysis.get("action_required") else "NO"
+                action_reason = analysis.get("reason", "No action needed.")
+
+                summary_text = f"""
+================================================================================
+📰 EXECUTIVE INTELLIGENCE BRIEFING
+================================================================================
+📌 Subject: {content.get('subject')}
+👤 Sender:  {content.get('sender')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 EXECUTIVE SUMMARY & CONTEXT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{exec_summary}{insights_section}{external_highlights_section}{takeaways_section}{translation_section}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 ACTION STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Action Required: {action_status}
+Reason: {action_reason}{sources_section}
+================================================================================
 """
 
                 # Stage 6 (cont): Dispatch Forward or Simulate Dry-Run
                 if dry_run:
+                    print(f"\n{summary_text.strip()}\n")
                     print(f"[DRY-RUN] Simulated summary generated for '{content.get('subject')}'. Skipping forward/label.")
                     stats["processed"] += 1
                 else:
@@ -249,6 +326,7 @@ Reason: {analysis.get('reason', 'None')}{unsubscribe_section}
         print(f"Filtered (purchase): {stats['purchase']}")
         print(f"Filtered (already summarized): {stats['already_summarized']}")
         print(f"Processed & forwarded: {stats['processed']}")
+        print(f"External sources ingested: {stats['external_sources_fetched']}")
         if dry_run:
             print("Mode: DRY-RUN (no modifications made)")
         print("=" * 50)

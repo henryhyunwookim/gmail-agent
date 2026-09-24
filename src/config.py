@@ -43,6 +43,15 @@ DEFAULT_SCHEDULE: str = "0 5,17 * * *"
 # Default timezone for scheduled execution
 DEFAULT_TIMEZONE: str = "Asia/Seoul"
 
+# Default flag whether to ingest external content (articles, YouTube transcripts, audio/podcasts)
+DEFAULT_ENABLE_EXTERNAL_FETCH: bool = True
+
+# Default maximum number of external candidate links fetched per email
+DEFAULT_MAX_EXTERNAL_LINKS: int = 2
+
+# Default maximum characters of email body passed to Gemini (expanded from 4,000 to 40,000)
+DEFAULT_MAX_BODY_CHARS: int = 40000
+
 
 # ==============================================================================
 # SECTION 2: Runtime Parameters & Environment Overrides
@@ -162,38 +171,142 @@ def get_interval_minutes(override: int | None = None) -> int | None:
     return None
 
 
+def get_enable_external_fetch(override: bool | None = None) -> bool:
+    """
+    Returns whether external link ingestion (articles, YouTube, podcasts) is enabled.
+
+    Resolution Priority:
+        1. Explicit override parameter (if provided).
+        2. `ENABLE_EXTERNAL_FETCH` environment variable ('true', '1', 'yes').
+        3. `DEFAULT_ENABLE_EXTERNAL_FETCH` (True).
+
+    Args:
+        override: Optional boolean override.
+
+    Returns:
+        Boolean indicating if external link content should be retrieved.
+    """
+    if override is not None:
+        return bool(override)
+    env_val = os.getenv("ENABLE_EXTERNAL_FETCH")
+    if env_val is not None:
+        return env_val.strip().lower() in ("true", "1", "yes", "on")
+    return DEFAULT_ENABLE_EXTERNAL_FETCH
+
+
+def get_max_external_links(override: int | None = None) -> int:
+    """
+    Returns the maximum number of external links fetched per email.
+
+    Resolution Priority:
+        1. Explicit override parameter (if valid integer >= 0).
+        2. `MAX_EXTERNAL_LINKS` environment variable.
+        3. `DEFAULT_MAX_EXTERNAL_LINKS` (2).
+
+    Args:
+        override: Optional integer limit override.
+
+    Returns:
+        Integer maximum link count.
+    """
+    if override is not None:
+        try:
+            val = int(override)
+            if val >= 0:
+                return val
+        except (ValueError, TypeError):
+            pass
+    env_val = os.getenv("MAX_EXTERNAL_LINKS")
+    if env_val:
+        try:
+            val = int(env_val)
+            if val >= 0:
+                return val
+        except (ValueError, TypeError):
+            pass
+    return DEFAULT_MAX_EXTERNAL_LINKS
+
+
+def get_max_body_chars(override: int | None = None) -> int:
+    """
+    Returns the maximum character length of email bodies passed to Gemini.
+
+    Resolution Priority:
+        1. Explicit override parameter (if valid integer > 0).
+        2. `MAX_BODY_CHARS` environment variable.
+        3. `DEFAULT_MAX_BODY_CHARS` (40,000 characters).
+
+    Args:
+        override: Optional integer character limit.
+
+    Returns:
+        Integer character threshold.
+    """
+    if override is not None:
+        try:
+            val = int(override)
+            if val > 0:
+                return val
+        except (ValueError, TypeError):
+            pass
+    env_val = os.getenv("MAX_BODY_CHARS")
+    if env_val:
+        try:
+            val = int(env_val)
+            if val > 0:
+                return val
+        except (ValueError, TypeError):
+            pass
+    return DEFAULT_MAX_BODY_CHARS
+
+
 # ==============================================================================
 # SECTION 3: GCP Project & Cloud Secret Manager Resolution
 # ==============================================================================
+
+# Cache resolved project ID and secrets in memory during process runtime
+_CACHED_PROJECT_ID: str | None = None
+_CACHED_SECRETS: dict[str, str] = {}
+
 
 def get_project_id() -> str | None:
     """
     Resolves the Google Cloud project ID across local and cloud environments.
 
     Resolution Cascade:
-        1. Environment variables: `GCP_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`.
-        2. Cloud Run / Compute Engine internal metadata server.
-        3. Local gcloud CLI active configuration (`gcloud config get-value project`).
+        1. In-memory runtime cache.
+        2. Environment variables: `GCP_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`.
+        3. Cloud Run / Compute Engine internal metadata server (if running in GCP).
+        4. Local gcloud CLI active configuration (`gcloud config get-value project`).
 
     Returns:
         The resolved project ID string, or None if undetermined.
     """
+    global _CACHED_PROJECT_ID
+    if _CACHED_PROJECT_ID:
+        return _CACHED_PROJECT_ID
+
     project_id = os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
     if project_id:
-        return project_id.strip()
+        _CACHED_PROJECT_ID = project_id.strip()
+        return _CACHED_PROJECT_ID
 
-    # Step 2: Cloud Run / Compute Engine metadata server resolution
-    try:
-        import requests
-        resp = requests.get(
-            "http://metadata.google.internal/computeMetadata/v1/project/project-id",
-            headers={"Metadata-Flavor": "Google"},
-            timeout=1,
-        )
-        if resp.status_code == 200 and resp.text.strip():
-            return resp.text.strip()
-    except Exception:
-        pass
+    is_cloud = os.getenv("K_SERVICE") is not None
+
+    # Step 2: Cloud Run / Compute Engine metadata server resolution (only if in cloud)
+    if is_cloud or sys.platform != "win32":
+        try:
+            import requests
+            resp = requests.get(
+                "http://metadata.google.internal/computeMetadata/v1/project/project-id",
+                headers={"Metadata-Flavor": "Google"},
+                timeout=1.0,
+            )
+            if resp.status_code == 200 and resp.text.strip():
+                _CACHED_PROJECT_ID = resp.text.strip()
+                return _CACHED_PROJECT_ID
+        except Exception:
+            pass
 
     # Step 3: Local CLI fallback via gcloud config
     try:
@@ -203,12 +316,13 @@ def get_project_id() -> str | None:
             capture_output=True,
             text=True,
             check=True,
-            timeout=5,
+            timeout=15,
             shell=is_win,
         )
         cli_project = res.stdout.strip()
         if cli_project and cli_project != "(unset)":
-            return cli_project
+            _CACHED_PROJECT_ID = cli_project
+            return _CACHED_PROJECT_ID
     except Exception:
         pass
 
@@ -220,6 +334,7 @@ def resolve_cloud_secret(secret_id: str, project_id: str | None = None) -> str |
     Resolves a secret version from Google Cloud Secret Manager.
 
     Uses a dual-mode strategy:
+        - In-memory cache for process lifetime.
         - On Cloud Run: Uses Python SecretManagerServiceClient with container IAM credentials.
         - On Local PCs: Uses `gcloud secrets versions access` CLI using user credentials,
           falling back to Python SDK.
@@ -234,6 +349,9 @@ def resolve_cloud_secret(secret_id: str, project_id: str | None = None) -> str |
     if not secret_id:
         return None
 
+    if secret_id in _CACHED_SECRETS:
+        return _CACHED_SECRETS[secret_id]
+
     target_project = project_id or get_project_id()
     if not target_project:
         return None
@@ -246,10 +364,14 @@ def resolve_cloud_secret(secret_id: str, project_id: str | None = None) -> str |
 
             client = secretmanager.SecretManagerServiceClient()
             name = f"projects/{target_project}/secrets/{secret_id}/versions/latest"
-            response = client.access_secret_version(request={"name": name}, timeout=4.0)
-            return response.payload.data.decode("utf-8").strip()
+            response = client.access_secret_version(request={"name": name}, timeout=5.0)
+            val = response.payload.data.decode("utf-8").strip()
+            if val:
+                _CACHED_SECRETS[secret_id] = val
+                return val
         except Exception:
-            return None
+            pass
+        return None
 
     def _try_cli() -> str | None:
         try:
@@ -263,10 +385,14 @@ def resolve_cloud_secret(secret_id: str, project_id: str | None = None) -> str |
                 f"--secret={secret_id}",
                 f"--project={target_project}",
             ]
-            res = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=8, shell=is_win)
-            return res.stdout.strip()
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=15, shell=is_win)
+            val = res.stdout.strip()
+            if val:
+                _CACHED_SECRETS[secret_id] = val
+                return val
         except Exception:
-            return None
+            pass
+        return None
 
     # Environment-sensitive resolution order
     if is_cloud:

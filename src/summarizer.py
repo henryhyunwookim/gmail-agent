@@ -33,6 +33,13 @@ from typing import Any, Optional
 from bs4 import BeautifulSoup
 import google.generativeai as genai
 
+from src.config import (
+    get_enable_external_fetch,
+    get_max_body_chars,
+    get_max_external_links,
+)
+from src.content_fetcher import ContentFetcher
+
 
 class EmailSummarizer:
     """
@@ -45,7 +52,7 @@ class EmailSummarizer:
 
     def __init__(self, api_key: str, model_name: str | None = None) -> None:
         """
-        Initializes the Gemini GenerativeModel client.
+        Initializes the Gemini GenerativeModel client and ContentFetcher.
 
         Args:
             api_key: Valid Google Gemini AI API key.
@@ -55,6 +62,7 @@ class EmailSummarizer:
         genai.configure(api_key=api_key)
         selected_model = model_name or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         self.model = genai.GenerativeModel(selected_model)
+        self.content_fetcher = ContentFetcher()
 
     # ==========================================================================
     # SECTION 2: Multilingual Unsubscribe Link Extraction
@@ -184,34 +192,82 @@ class EmailSummarizer:
         include_translation: bool = False,
     ) -> dict[str, Any]:
         """
-        Summarizes email content using Gemini 3.8 Flash and evaluates required actions.
+        Generates an executive-grade, insightful newsletter briefing with deep context.
 
-        Special Handling:
-            - When `include_translation=True` (for FTChinese newsletters), generates a
-              sentence-by-sentence Chinese study section (Original, Pinyin, English, Vocab).
-            - When `include_translation=False`, generates a structured overview with
-              topical insights and action detection.
+        Capabilities:
+            - External Link Ingestion: Discovers and fetches candidate full articles,
+              YouTube transcripts, and podcast show notes referenced in the email.
+            - Expanded Context Limits: Processes up to 40,000 characters of email body.
+            - Deep-Dive Intelligence: Generates an executive overview, detailed key insights,
+              external source highlights, and actionable takeaways.
+            - FTChinese Dual Mode: Provides both the comprehensive article briefing
+              AND the educational sentence-by-sentence Chinese study breakdown.
 
         Args:
-            email_content: Dictionary containing 'subject', 'sender', and 'body'.
+            email_content: Dictionary containing 'subject', 'sender', 'body', and optional 'html_body'.
             include_translation: Whether to generate educational FTChinese breakdown.
 
         Returns:
-            Dictionary containing structured summary, action_required flag, and metadata.
+            Dictionary containing structured summary, key insights, external sources,
+            action_required flag, and metadata.
         """
-        unsubscribe_link = self.extract_unsubscribe_link(email_content.get("body", ""))
+        # Resolve unsubscribe link from HTML or plain body
+        html_body = email_content.get("html_body", "")
+        plain_body = email_content.get("body", "")
+        unsubscribe_link = self.extract_unsubscribe_link(html_body or plain_body)
 
+        # Step 1: External content discovery & ingestion
+        external_context = ""
+        fetched_sources: list[dict[str, Any]] = []
+
+        if get_enable_external_fetch():
+            candidate_links = self.content_fetcher.extract_candidate_links(
+                email_body_html=html_body,
+                email_body_text=plain_body,
+                max_links=get_max_external_links(),
+            )
+            for cand in candidate_links:
+                url = cand["url"]
+                ltype = cand["type"]
+                print(f"[SUMMARIZER] Ingesting external {ltype} source: {url}")
+                fetched = self.content_fetcher.fetch_content(url, ltype)
+                if fetched.get("success") and fetched.get("content"):
+                    fetched_sources.append(fetched)
+                    external_context += (
+                        f"\n\n=== EXTERNAL SOURCE CONTENT ({ltype.upper()}): {url} ===\n"
+                        f"{fetched.get('content', '')[:15000]}\n"
+                        f"=== END EXTERNAL SOURCE ===\n"
+                    )
+
+        # Step 2: Body length resolution
+        max_chars = get_max_body_chars()
+        truncated_body = plain_body[:max_chars]
+
+        # Step 3: Construct AI Prompt
         if include_translation:
-            prompt = f"""You are an intelligent email assistant specialized in Chinese language learning. Analyze the following FTChinese email and provide a structured learning breakdown.
+            prompt = f"""You are an intelligent executive analyst and Chinese language education specialist.
+Analyze the following FTChinese email (and any fetched external article content) and provide a comprehensive, high-value newsletter briefing along with a structured Chinese study breakdown.
 
 Email Subject: {email_content.get('subject', '')}
 Email Sender: {email_content.get('sender', '')}
-Email Body:
-{email_content.get('body', '')[:4000]}
+Email Content:
+{truncated_body}
+{external_context}
 
-IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additional text):
+IMPORTANT: You must respond with ONLY valid JSON in this exact structure (no markdown fences, no explanatory preamble):
 {{
-    "action_required": true,
+    "executive_summary": "A rich, comprehensive 2-3 paragraph executive briefing that provides full context, explains the narrative or developments, why it matters, and the big-picture significance.",
+    "key_insights": [
+        {{
+            "topic": "Specific Topic or Theme",
+            "details": "Detailed, deep-dive explanation with facts, data, arguments, or policy implications."
+        }}
+    ],
+    "actionable_takeaways": [
+        "Key takeaway or strategic implication 1",
+        "Key takeaway or strategic implication 2"
+    ],
+    "action_required": false,
     "reason": "Brief explanation of why action is or isn't required",
     "learning_segments": [
         {{
@@ -226,40 +282,49 @@ IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additi
 }}
 
 Rules:
-- action_required: true if the email requires a response or action from the recipient, false otherwise
-- reason: Brief explanation (one sentence)
-- learning_segments: Break the email body down **sentence by sentence** for the first 5 distinct sentences of the main article content. Each segment should represent exactly one distinct sentence.
-- EXCLUDE any promotional content, advertisements, newsletter subscription reminders, or FTChinese membership benefits from the learning_segments. Focus ONLY on the first 5 sentences of the actual article or main content.
-- For each sentence in learning_segments, you MUST provide the original Chinese text, the pinyin with tone marks, a list of up to 3 key vocabulary words, and the English translation.
-- Output ONLY the JSON object, nothing else
+- executive_summary: A thorough briefing (not a one-liner). Provide necessary background, who/what is involved, and why it matters.
+- key_insights: Provide 2-5 detailed, nuanced thematic insights. Each insight must offer meaningful depth, facts, and analysis.
+- actionable_takeaways: 2-4 strategic takeaways, implications, or lessons from the content.
+- action_required: true if the email requires a reply, approval, or task from the recipient, false otherwise.
+- reason: Brief one-sentence explanation.
+- learning_segments: Break the email body down sentence by sentence for the first 5 distinct sentences of the main article content (exclude ads, promotions, footer links). Provide original Chinese, pinyin with tone marks, up to 3 vocabulary words, and English translation.
+- Output ONLY the JSON object, nothing else.
 """
         else:
-            prompt = f"""You are an intelligent email assistant. Analyze the following email and provide a structured response.
+            prompt = f"""You are an intelligent executive analyst. Analyze the following email (and any fetched external source content such as full articles, YouTube transcripts, or podcast notes) to produce a high-value, insightful, and comprehensive executive newsletter briefing.
 
 Email Subject: {email_content.get('subject', '')}
 Email Sender: {email_content.get('sender', '')}
-Email Body:
-{email_content.get('body', '')[:4000]}
+Email Content:
+{truncated_body}
+{external_context}
 
-IMPORTANT: You must respond with ONLY valid JSON in this exact format (no additional text):
+IMPORTANT: You must respond with ONLY valid JSON in this exact structure (no markdown fences, no explanatory preamble):
 {{
-    "summary": "A concise 1-2 sentence overall summary of the email",
-    "sections": [
+    "executive_summary": "A rich, comprehensive 2-3 paragraph briefing that gives full context, explains the narrative or developments, why it matters, and the big-picture significance.",
+    "key_insights": [
         {{
-            "topic": "Topic or theme of this section",
-            "insight": "Key insight, information, or takeaway from this section"
+            "topic": "Specific Topic or Theme",
+            "details": "Detailed, deep-dive explanation with facts, data, arguments, quotes, or technical details derived from the email and any external source."
         }}
     ],
-    "action_required": true,
+    "external_source_highlights": "If external links (article, video transcript, audio) were provided and analyzed, synthesize the valuable details, arguments, or demonstrations discovered beyond the email preview. If no external sources were present or fetched, return null.",
+    "actionable_takeaways": [
+        "Key takeaway, practical recommendation, or strategic implication 1",
+        "Key takeaway, practical recommendation, or strategic implication 2"
+    ],
+    "action_required": false,
     "reason": "Brief explanation of why action is or isn't required"
 }}
 
 Rules:
-- summary: Concise overall summary of the email (1-2 sentences)
-- sections: Break down the email into logical sections.
-- action_required: true if the email requires a response or action from the recipient, false otherwise
-- reason: Brief explanation (one sentence)
-- Output ONLY the JSON object, nothing else
+- executive_summary: A thorough executive overview (not a short 1-sentence one-liner). Provide context, background, and significance.
+- key_insights: Provide 2-5 detailed, substantive thematic insights with supporting evidence and specifics.
+- external_source_highlights: Highlight valuable information extracted from external sources if present; otherwise null.
+- actionable_takeaways: 2-4 actionable takeaways or key implications.
+- action_required: true if the email requires a response, decision, or action from the recipient, false otherwise.
+- reason: Brief one-sentence explanation.
+- Output ONLY the JSON object, nothing else.
 """
 
         max_retries: int = 5
@@ -280,24 +345,42 @@ Rules:
                 # Step 2: Attempt standard JSON parsing
                 try:
                     result = json.loads(extracted_json)
-                    result["unsubscribe_link"] = unsubscribe_link
-                    return result
                 except json.JSONDecodeError:
                     # Step 3: Regex fallback for JSON object boundaries
                     json_match = re.search(r"(\{[\s\S]*\})", text)
                     if json_match:
                         try:
                             result = json.loads(json_match.group(1))
-                            result["unsubscribe_link"] = unsubscribe_link
-                            return result
                         except json.JSONDecodeError:
-                            pass
-
-                    if attempt == max_retries - 1:
-                        raise ValueError(f"Could not parse JSON from Gemini response: {text[:100]}...")
+                            if attempt == max_retries - 1:
+                                raise ValueError(f"Could not parse JSON from Gemini response: {text[:100]}...")
+                            print(f"JSON parsing failed on attempt {attempt + 1}. Retrying...")
+                            continue
                     else:
-                        print(f"JSON parsing failed on attempt {attempt + 1}. Retrying...")
+                        if attempt == max_retries - 1:
+                            raise ValueError(f"No JSON object detected in response: {text[:100]}...")
                         continue
+
+                # Normalize keys for backwards and forwards compatibility
+                if "executive_summary" in result and "summary" not in result:
+                    result["summary"] = result["executive_summary"]
+                elif "summary" in result and "executive_summary" not in result:
+                    result["executive_summary"] = result["summary"]
+
+                if "key_insights" in result and "sections" not in result:
+                    result["sections"] = [
+                        {"topic": item.get("topic", "Insight"), "insight": item.get("details", "")}
+                        for item in result.get("key_insights", [])
+                    ]
+                elif "sections" in result and "key_insights" not in result:
+                    result["key_insights"] = [
+                        {"topic": item.get("topic", "Insight"), "details": item.get("insight", "")}
+                        for item in result.get("sections", [])
+                    ]
+
+                result["unsubscribe_link"] = unsubscribe_link
+                result["external_sources"] = fetched_sources
+                return result
 
             except Exception as e:
                 error_msg = str(e)
@@ -313,15 +396,23 @@ Rules:
                     traceback.print_exc()
                     print(f"Error summarizing email after {max_retries} attempts: {e}")
                     return {
+                        "executive_summary": "Error summarizing email.",
                         "summary": "Error summarizing email.",
+                        "key_insights": [],
+                        "sections": [],
                         "action_required": False,
                         "reason": f"AI processing failed: {str(e)}",
                         "unsubscribe_link": unsubscribe_link,
+                        "external_sources": fetched_sources,
                     }
 
         return {
+            "executive_summary": "Error summarizing email.",
             "summary": "Error summarizing email.",
+            "key_insights": [],
+            "sections": [],
             "action_required": False,
             "reason": "AI processing failed: Maximum retries exceeded.",
             "unsubscribe_link": unsubscribe_link,
+            "external_sources": fetched_sources,
         }

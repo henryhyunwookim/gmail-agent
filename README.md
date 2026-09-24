@@ -4,14 +4,15 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 ## Features
 
-- 🤖 **AI-Powered Summarization**: Uses Gemini 3.8 Flash to create concise email summaries
-- 💡 **Section-Based Insights**: Breaks down emails into logical sections with topics and key insights
-- 📚 **Chinese Study Corner**: Automatically detects emails from FTChinese and generates original text, pinyin, and vocabulary
-- 🎯 **Action Detection**: Automatically identifies emails requiring your attention
-- 🏷️ **Auto-Labeling**: Applies Gmail labels (`ActionRequired` or `ReadLater`)
-- 🔗 **Unsubscribe Detection**: Automatically extracts unsubscribe/opt-out links for easy access
-- ⚙️ **Configurable Limits & Schedule**: Easily adjust the batch size of emails to read (default: 20) and execution schedule (cron/intervals) without touching code
-- ☁️ **Cloud Deployment**: Runs on Google Cloud Run (Free Tier eligible)
+- 📰 **Executive-Grade Intelligence Briefings**: Goes beyond superficial one-liners to provide comprehensive context, background significance, and practical takeaways.
+- 🌐 **External Content & Media Ingestion**: Automatically detects linked web articles, YouTube videos (extracting audio transcripts), and podcasts, analyzing full source content beyond initial email previews.
+- 💡 **Deep-Dive Key Insights**: Breaks down emails and linked sources into rich, analytical thematic sections with specific facts, data points, and strategic implications.
+- ⚡ **Actionable Takeaways**: Clearly highlights key next steps, decisions, and recommendations.
+- 📚 **FTChinese Deep-Dive & Study Corner**: Comprehensive article briefing coupled with an educational sentence-by-sentence Chinese study section (Original, Pinyin, English, Key Vocabulary).
+- 🎯 **Action Detection & Auto-Labeling**: Automatically flags emails requiring action and applies Gmail labels (`ActionRequired` or `ReadLater`).
+- 🔗 **Smart Link Architecture**: Preserves hyperlinks and extracts unsubscribe/opt-out links for seamless one-click management.
+- ⚙️ **Configurable Limits & Schedule**: Easily adjust batch limits (`MAX_EMAILS`), external link ingestion (`ENABLE_EXTERNAL_FETCH`), body character limits (`MAX_BODY_CHARS`), and cron schedules.
+- ☁️ **Cloud Native & Multi-PC Portable**: Runs seamlessly on local Windows/macOS/Linux or serverless on Google Cloud Run.
 
 
 ## Architecture
@@ -103,24 +104,48 @@ Here's how an incoming email looks when processed by the agent:
 >
 > [You are receiving this because you are subscribed to Project Alpha Updates. Unsubscribe]
 
-**Agent's Summary Email:**
-> **Original Sender:** Sarah Jones (via Project Alpha Updates) <<sarah.jones@example.com>><br>
-> **Subject:** Project Alpha Update & Q4 Planning
->
-> **Summary:**<br>
-> Sarah reports that the Project Alpha backend is complete, but frontend integration is delayed by ~2 days due to auth issues. She requests a Q4 planning meeting next Tuesday at 2 PM.
->
-> **Insights**<br>
-> ・Backend Status: API implementation is complete with passing tests.<br>
-> ・Frontend Issues: Delays caused by authentication flow integration.<br>
-> ・Scheduling: Requests meeting on Tuesday @ 2 PM for Q4 roadmap.<br>
->
-> **Action Required**: YES<br>
-> **Reason**: Needs confirmation for the proposed meeting time.
->
-> **Unsubscribe Link**: [Link found in email]
-
-As you can imagine, insights can be a lot more helpful for longer emails.
+**Agent's Executive Intelligence Briefing:**
+> ================================================================================<br>
+> 📰 **EXECUTIVE INTELLIGENCE BRIEFING**<br>
+> ================================================================================<br>
+> 📌 **Subject:** Project Alpha Update & Q4 Planning<br>
+> 👤 **Sender:** Sarah Jones (via Project Alpha Updates) <<sarah.jones@example.com>><br>
+> <br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> 💡 **EXECUTIVE SUMMARY & CONTEXT**<br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> Sarah Jones reports that the backend API for Project Alpha has achieved full test coverage and reached production completion. However, client-side rollout is experiencing a brief 48-hour delay stemming from OAuth token refresh edge-cases in the new authentication flow. In parallel, team leadership is finalizing the Q4 engineering roadmap to prioritize incoming feature requests.<br>
+> <br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> 🔍 **DEEP-DIVE KEY INSIGHTS**<br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> • [Backend Architecture]: Core REST endpoints are fully deployed with automated CI test suites passing.<br>
+> • [Frontend Auth Bottleneck]: Integration roadblock isolated to state synchronization in the revised OAuth flow; estimated resolution within 2 working days.<br>
+> • [Q4 Milestone Scheduling]: Team planning session proposed for Tuesday at 2:00 PM to lock down quarterly feature delivery commitments.<br>
+> <br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> 🌐 **EXTERNAL SOURCE INSIGHTS (Full Article / Video / Audio)**<br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> Video demo demonstrates the new multi-tenant auth architecture and interactive dashboard prototype.<br>
+> <br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> ⚡ **ACTIONABLE TAKEAWAYS**<br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> • Confirm availability for the Q4 planning meeting on Tuesday at 2:00 PM.<br>
+> • Review frontend auth branch PR before Wednesday's scheduled merge window.<br>
+> <br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> 🎯 **ACTION STATUS**<br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> **Action Required**: YES ⚠️<br>
+> **Reason**: Needs calendar confirmation for the proposed planning meeting time.<br>
+> <br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> 🔗 **REFERENCED SOURCES & LINKS**<br>
+> ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
+> • [YOUTUBE] Project Alpha Walkthrough: https://youtube.com/watch?v=...<br>
+> • [UNSUBSCRIBE] https://example.com/unsubscribe<br>
+> ================================================================================
 
 ## 🎨 Personalization Showcase
 
@@ -307,6 +332,30 @@ You can easily configure the maximum number of unread emails fetched and summari
   ```bash
   curl -X POST "https://<SERVICE_URL>/?max_emails=20"
   ```
+
+### External Content & Media Ingestion Controls
+
+The agent can crawl substantive primary sources linked within email messages (e.g. Substack, Medium, news publications, YouTube video transcripts, and podcast notes) to enrich Gemini's synthesis:
+
+- **Environment Configuration**:
+  ```env
+  # Enable/disable external link ingestion (default: true)
+  ENABLE_EXTERNAL_FETCH=true
+
+  # Maximum candidate external links fetched per email (default: 2)
+  MAX_EXTERNAL_LINKS=2
+
+  # Per-link network timeout in seconds (default: 8)
+  FETCH_TIMEOUT_SECONDS=8
+
+  # Maximum character limit of email body fed to Gemini (default: 40000)
+  MAX_BODY_CHARS=40000
+  ```
+
+- **Built-in Resilience & Anti-Barrier Guards**:
+  - **Login Walls & Paywalls**: Detects and rejects pages requiring user credentials, subscription barriers, or security challenges (`401 Unauthorized`, `403 Forbidden`, Cloudflare bot checks, login redirects) without interrupting email processing.
+  - **Intelligent Link Discarding**: Automatically ignores tracking links (`utm_*`, `gclid`), unsubscribe/preference slugs, binary assets, and social media URLs.
+  - **Fail-Safe Fallbacks**: If external scraping fails or encounters an access wall, the agent gracefully falls back to synthesizing the original email body without error.
 
 ### Schedule & Frequency (When and How Often to Run)
 

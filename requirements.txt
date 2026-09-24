@@ -10,3 +10,4 @@ gunicorn>=22.0.0
 requests>=2.31.0
 google-cloud-secret-manager>=2.20.0
 google-cloud-storage>=2.14.0
+youtube-transcript-api>=0.6.2
