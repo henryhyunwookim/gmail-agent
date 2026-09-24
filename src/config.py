@@ -9,14 +9,13 @@ Purpose:
 
 Resolution Priority Cascade:
     1. Explicit Function / CLI Call Overrides (highest precedence)
-    2. Local or Container Environment Variables (`.env`, Cloud Run ENV)
+    2. OS or Container Runtime Environment Variables (Cloud Run ENV)
     3. Google Cloud Secret Manager (`gemini-api-key`, `gmail-agent-token`, etc.)
     4. Canonical Codebase Defaults (fallback)
 
 Multi-PC Portability Guarantee:
-    When running on a machine without a local `.env` file, configuration
-    gracefully auto-resolves from active Google Cloud SDK (`gcloud`) project
-    settings and Google Cloud Secret Manager.
+    Runs out-of-the-box on any machine with active Google Cloud SDK (`gcloud`)
+    authentication, resolving all secrets dynamically from Secret Manager with zero local files.
 """
 from __future__ import annotations
 
@@ -24,10 +23,6 @@ import os
 import subprocess
 import sys
 from typing import Optional
-from dotenv import load_dotenv
-
-# Automatically load environment variables from .env if present in workspace
-load_dotenv()
 
 
 # ==============================================================================
@@ -63,7 +58,7 @@ def get_max_emails(override: int | None = None) -> int:
 
     Resolution Priority:
         1. Explicit function/CLI override (if valid integer > 0).
-        2. `MAX_EMAILS` environment variable (from `.env` or Cloud Run ENV).
+        2. `MAX_EMAILS` environment variable (Cloud Run ENV or OS).
         3. `DEFAULT_MAX_EMAILS` (single source of truth: 20).
 
     Args:

@@ -8,7 +8,7 @@
     access the new credentials immediately without requiring any code redeployment.
 
 .PARAMETER ProjectId
-    The Google Cloud Project ID. Defaults to $GCP_PROJECT_ID from .env or active gcloud config.
+    The Google Cloud Project ID. Defaults to active gcloud project.
 
 .PARAMETER SecretName
     The target secret name in Secret Manager. Defaults to 'gmail-agent-token'.
@@ -38,24 +38,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 # ==============================================================================
-# SECTION 1: Environment & Parameter Resolution
+# SECTION 1: Parameter & Project Resolution
 # ==============================================================================
-
-# Read .env file if present in workspace root
-if (Test-Path ".env") {
-    Get-Content .env | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]*)\s*=\s*(.*)$') {
-            $envKey = $matches[1].Trim()
-            $envVal = $matches[2].Trim()
-            Set-Variable -Name $envKey -Value $envVal -Scope Script
-        }
-    }
-}
 
 $TARGET_PROJECT = if ($ProjectId) { 
     $ProjectId 
-} elseif ($GCP_PROJECT_ID) { 
-    $GCP_PROJECT_ID 
 } else { 
     (gcloud config get-value project 2>$null).Trim() 
 }

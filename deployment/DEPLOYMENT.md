@@ -99,7 +99,7 @@ mkdir logs
    - Enable required Google Cloud APIs
    - Build and deploy the container to Cloud Run
    - Create a Service Account for the scheduler
-   - Configure Cloud Scheduler with your custom schedule and timezone from `.env` (defaults to twice daily at 5:00 AM and 5:00 PM)
+   - Configure Cloud Scheduler with your custom schedule and timezone (defaults to twice daily at 5:00 AM and 5:00 PM)
 
 ### Pros & Cons
 ✅ Runs 24/7  
@@ -227,7 +227,8 @@ python -m src.main >> logs/agent.log 2>&1
 ## Security Considerations
 
 1. **Protect credentials**:
-   - Never commit `credentials.json` or `.env` to git
+   - Rely on Google Cloud Secret Manager instead of local files
+   - Never commit `credentials.json` or sensitive tokens to git
    - Use environment variables in production
    - Rotate API keys regularly
 

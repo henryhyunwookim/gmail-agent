@@ -31,8 +31,6 @@ import time
 from datetime import datetime
 from typing import Any, Optional
 
-from dotenv import load_dotenv
-
 from src.auth import authenticate_gmail
 from src.config import (
     DEFAULT_MAX_EMAILS,
@@ -72,8 +70,6 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
             - `stats` (dict): Breakdown of processed, filtered, and total email counts.
             - `error` (str | None): Error message if an exception occurred.
     """
-    load_dotenv()
-
     # Ensure UTF-8 console output on Windows to prevent UnicodeEncodeError
     if sys.platform == "win32":
         try:

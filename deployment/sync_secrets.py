@@ -14,14 +14,13 @@ Prerequisites & Dependencies:
     - Python 3.10+
     - Google Cloud SDK (`gcloud` CLI installed and authenticated via `gcloud auth login`)
       OR Google Cloud Secret Manager Python client (`google-cloud-secret-manager`).
-    - Python package `python-dotenv` for loading optional local `.env` files.
 
 Inputs & Outputs:
     - Inputs:
         - `token.json` (local Gmail user OAuth token, if present)
         - `credentials.json` (local OAuth client secrets JSON, if present)
-        - `GEMINI_API_KEY` (from environment or local `.env`, if present)
-        - `--project` CLI flag or `GCP_PROJECT_ID` environment variable
+        - `GEMINI_API_KEY` (from environment or prompt, if present)
+        - `--project` CLI flag or active gcloud project
     - Outputs:
         - Creates / updates secrets in Google Cloud Secret Manager:
             - `gmail-agent-token`
@@ -37,11 +36,6 @@ import subprocess
 import sys
 import tempfile
 from typing import Optional
-
-from dotenv import load_dotenv
-
-# Load local environment variables if a .env file exists
-load_dotenv()
 
 
 # ==============================================================================

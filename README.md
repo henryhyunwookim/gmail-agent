@@ -202,32 +202,18 @@ pip install -r requirements.txt
 4. Create OAuth 2.0 credentials (Desktop app)
 5. Download `credentials.json` and place it in the project root
 
-### 4. Set Up Gemini API
+### 4. Set Up Gemini API Key in Secret Manager
 
-1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create an API key
-3. Copy `.env.example` to `.env`:
+Store your Gemini API key in **Google Cloud Secret Manager** so it is automatically resolved on any machine or Cloud Run without local files:
 
 ```bash
-cp .env.example .env
+# Store Gemini API key in Secret Manager
+gcloud secrets create gemini-api-key --data-file=- << 'EOF'
+your_gemini_api_key_here
+EOF
 ```
 
-4. Edit `.env` and add your API key and GCP configuration:
-
-```env
-GEMINI_API_KEY=your_actual_api_key
-
-# Email Processing Configuration
-MAX_EMAILS=20
-
-# GCP Configuration (needed for cloud deployment)
-GCP_PROJECT_ID=your-gcp-project-id
-GCP_REGION=asia-northeast1
-SERVICE_NAME=gmail-agent
-JOB_NAME=gmail-agent-daily-trigger
-SCHEDULE=0 5,17 * * *
-TIMEZONE=Asia/Seoul
-```
+*(Alternatively, run `python sync_secrets.py` to synchronize any existing local keys/tokens directly into Secret Manager).*
 
 ### 5. Authenticate Gmail
 
@@ -253,6 +239,12 @@ Or specify a custom email batch limit via CLI flag:
 python -m src.main --max-emails 20
 ```
 
+Or run in simulation / dry-run mode:
+
+```bash
+python -m src.main --dry-run --max-emails 5
+```
+
 Or run continuously on a recurring interval (e.g. every 30 minutes):
 
 ```bash
@@ -260,31 +252,30 @@ python -m src.main --interval 30
 ```
 
 This will:
-- Check for unread emails (up to `MAX_EMAILS`, default: 20)
-- Summarize them using Gemini AI with section-based insights
+- Check for unread emails (up to batch limit, default: 20)
+- Ingest external primary articles, YouTube video transcripts, or podcasts
+- Summarize them using Gemini AI with rich executive intelligence briefings
 - Forward summaries to your email within the original thread
 - Apply Gmail labels (`ActionRequired` or `ReadLater`)
-- Display processing statistics
+- Record execution telemetry to Google Cloud Storage
 
 ## Cloud Deployment (Google Cloud Run)
 
 ### Prerequisites
 
-- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) installed
-- Google Cloud Project with billing enabled
+- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) installed and authenticated (`gcloud auth login`)
+- Google Cloud Project configured (`gcloud config set project YOUR_PROJECT_ID`)
 
 ### Deploy
 
-1. Ensure your `.env` file has the correct `GCP_PROJECT_ID` set
-
-2. Run the deployment script:
+Run the deployment script:
 
 ```powershell
-# Standard deployment (reads .env or gcloud config defaults):
+# Standard deployment (uses active gcloud project and defaults):
 .\deployment\deploy_cloud.ps1
 
 # Or with explicit parameters:
-.\deployment\deploy_cloud.ps1 -ProjectId "YOUR_PROJECT_ID" -Region "asia-northeast1" -Schedule "0 5,17 * * *"
+.\deployment\deploy_cloud.ps1 -ProjectId "gen-lang-client-0480639565" -Region "asia-northeast1" -Schedule "0 5,17 * * *"
 ```
 
 The script will:
@@ -308,27 +299,32 @@ gcloud scheduler jobs run gmail-agent-daily-trigger --location=asia-northeast1
 
 ## Configuration
 
-All primary behaviors can be configured without modifying source code by updating your `.env` file or providing command-line arguments.
+This system enforces a **strict zero-local-`.env` cloud-native architecture**. All credentials, tokens, and sensitive information are resolved dynamically at runtime from **Google Cloud Secret Manager** and Google Cloud Storage. No `.env` files are needed or stored on local machines.
+
+All operational behaviors can be configured dynamically via command-line arguments, Cloud Run parameters, or deployment script flags:
 
 ### Email Processing Limit (Batch Size)
 
-You can easily configure the maximum number of unread emails fetched and summarized per run:
+Configure the maximum number of unread emails fetched and summarized per execution cycle:
 
-- **Via Environment Variable** (applies to both local runs and Cloud Run):
-  Set `MAX_EMAILS` in your `.env` file:
-  ```env
-  # Process up to 20 unread emails per execution cycle (default: 20)
-  MAX_EMAILS=20
-  ```
-
-- **Via Command-Line Argument** (local manual runs):
+- **Via Command-Line Argument** (local executions):
   Pass `-n` or `--max-emails` directly to the script:
   ```bash
   python -m src.main --max-emails 25
   ```
 
-- **Via HTTP Trigger** (Cloud Run endpoint):
-  Pass `max_emails` as a URL query parameter or in a JSON body:
+- **Via Deployment Parameter** (Google Cloud Run):
+  Pass `-MaxEmails` when executing the deployment script:
+  ```powershell
+  .\deployment\deploy_cloud.ps1 -MaxEmails 25
+  ```
+  Or update the live Cloud Run service directly:
+  ```bash
+  gcloud run services update gmail-agent --region=asia-northeast1 --set-env-vars="MAX_EMAILS=25"
+  ```
+
+- **Via HTTP Trigger** (Cloud Run endpoint / Cloud Scheduler):
+  Pass `max_emails` as a URL query parameter or JSON body:
   ```bash
   curl -X POST "https://<SERVICE_URL>/?max_emails=20"
   ```
@@ -337,19 +333,16 @@ You can easily configure the maximum number of unread emails fetched and summari
 
 The agent can crawl substantive primary sources linked within email messages (e.g. Substack, Medium, news publications, YouTube video transcripts, and podcast notes) to enrich Gemini's synthesis:
 
-- **Environment Configuration**:
-  ```env
-  # Enable/disable external link ingestion (default: true)
-  ENABLE_EXTERNAL_FETCH=true
+- **Default Parameters** (auto-configured in code & Cloud Run):
+  - Ingestion Enabled: `ENABLE_EXTERNAL_FETCH=true`
+  - Max External Links per Email: `MAX_EXTERNAL_LINKS=2`
+  - Network Timeout: `FETCH_TIMEOUT_SECONDS=8`
+  - Max Body Character Limit: `MAX_BODY_CHARS=40000`
 
-  # Maximum candidate external links fetched per email (default: 2)
-  MAX_EXTERNAL_LINKS=2
-
-  # Per-link network timeout in seconds (default: 8)
-  FETCH_TIMEOUT_SECONDS=8
-
-  # Maximum character limit of email body fed to Gemini (default: 40000)
-  MAX_BODY_CHARS=40000
+- **Customizing on Cloud Run**:
+  Update runtime variables in the cloud at any time:
+  ```bash
+  gcloud run services update gmail-agent --region=asia-northeast1 --set-env-vars="MAX_EXTERNAL_LINKS=3,FETCH_TIMEOUT_SECONDS=10"
   ```
 
 - **Built-in Resilience & Anti-Barrier Guards**:
@@ -362,16 +355,14 @@ The agent can crawl substantive primary sources linked within email messages (e.
 The execution timing and frequency can be tailored to your preference:
 
 #### 1. Cloud Deployment (Cloud Scheduler)
-Configure `SCHEDULE` and `TIMEZONE` in your `.env` file before running `.\deploy_cloud.ps1`. The deployment script will automatically configure or update the Cloud Scheduler job:
+Configure `Schedule` and `Timezone` directly when running `.\deployment\deploy_cloud.ps1`:
 
-```env
-# Standard 5-field cron syntax: (minute hour day-of-month month day-of-week)
-SCHEDULE=0 5,17 * * *
-TIMEZONE=Asia/Seoul
+```powershell
+.\deployment\deploy_cloud.ps1 -Schedule "0 5,17 * * *" -Timezone "Asia/Seoul"
 ```
 
 Common schedule patterns:
-| Frequency | Cron Expression (`SCHEDULE`) | Description |
+| Frequency | Cron Expression (`Schedule`) | Description |
 | :--- | :--- | :--- |
 | **Twice daily (Default)** | `0 5,17 * * *` | Runs at 5:00 AM and 5:00 PM every day |
 | **Once daily** | `0 8 * * *` | Runs every morning at 8:00 AM |
@@ -379,7 +370,10 @@ Common schedule patterns:
 | **Every 30 minutes** | `*/30 * * * *` | Runs every 30 minutes |
 | **Weekdays only** | `0 9 * * 1-5` | Runs Monday through Friday at 9:00 AM |
 
-> **Updating Schedule**: If you want to change the schedule after deploying, simply adjust `SCHEDULE` in `.env` and rerun `.\deploy_cloud.ps1`. Cloud Scheduler will be updated immediately.
+> **Updating Schedule in Cloud**: You can update Cloud Scheduler directly without redeploying code:
+> ```bash
+> gcloud scheduler jobs update http gmail-agent-daily-trigger --location=asia-northeast1 --schedule="0 8 * * *" --time-zone="Asia/Seoul"
+> ```
 
 #### 2. Local Deployment (Windows Task Scheduler)
 If you run the agent on your Windows computer using Task Scheduler:
@@ -436,7 +430,6 @@ gmail-agent/
 ├── run_agent.bat           # Windows executable & Task Scheduler launcher
 ├── sync_secrets.py         # Convenience CLI entry point for secret synchronization
 ├── deployment/
-│   ├── .env.example        # Reference template for cloud variables (optional locally)
 │   ├── DEPLOYMENT.md       # Multi-platform deployment guide
 │   ├── deploy_cloud.ps1    # Automated Cloud Run & Cloud Scheduler deployment script
 │   ├── sync_secrets.py     # Tool to sync local credentials to Secret Manager
@@ -448,10 +441,11 @@ gmail-agent/
     ├── app.py              # Flask HTTP webhook entry point for Cloud Run
     ├── auth.py             # Dual-mode multi-PC Gmail OAuth 2.0 resolver
     ├── config.py           # Centralized configuration & Secret Manager resolution
+    ├── content_fetcher.py  # Multi-modal web, YouTube, podcast content scraper & login guards
     ├── gmail_client.py     # Gmail API client & RFC 822 MIME message builder
     ├── main.py             # End-to-end batch processing pipeline & CLI runner
     ├── storage.py          # Google Cloud Storage state & decoupled run logging
-    └── summarizer.py       # AI summarization logic (Gemini 3.8 Flash)
+    └── summarizer.py       # AI executive summarization engine (Gemini 3.8 Flash)
 ```
 
 ## Cost Estimate
@@ -472,12 +466,9 @@ Running twice per day on Google Cloud Run:
 
 ## Security Notes
 
-⚠️ **Never commit these files to Git:**
-- `credentials.json`
-- `token.json`
-- `.env`
+The system is designed with a **cloud-native, zero-local-credentials** architecture. All sensitive API keys, OAuth client secrets, and access tokens are managed exclusively through **Google Cloud Secret Manager**.
 
-These files contain sensitive authentication data and are protected by `.gitignore`.
+`.gitignore` is strictly configured to guarantee that no ephemeral credentials (`credentials.json`, `token.json`, `.env`) are ever tracked or committed to Git.
 
 ## Troubleshooting
 

@@ -5,13 +5,13 @@
 .DESCRIPTION
     Deploys the Gmail Agent container to Google Cloud Run, configures IAM service accounts,
     enables required GCP APIs, and sets up Google Cloud Scheduler for scheduled inbox monitoring.
-    Automatically resolves configuration defaults from .env, gcloud CLI config, and src.config.
+    Automatically resolves configuration defaults from gcloud CLI config and src.config.
 
 .PARAMETER ProjectId
-    The Google Cloud Project ID to deploy to. Defaults to $GCP_PROJECT_ID from .env or active gcloud config.
+    The Google Cloud Project ID to deploy to. Defaults to active gcloud project.
 
 .PARAMETER Region
-    The Google Cloud Region (e.g. 'asia-northeast1'). Defaults to $GCP_REGION from .env or 'asia-northeast1'.
+    The Google Cloud Region (e.g. 'asia-northeast1'). Defaults to 'asia-northeast1'.
 
 .PARAMETER ServiceName
     The Cloud Run service name. Defaults to 'gmail-agent'.
@@ -20,13 +20,13 @@
     The Cloud Scheduler job name. Defaults to 'gmail-agent-daily-trigger'.
 
 .PARAMETER Schedule
-    The cron schedule expression. Defaults to value in .env or '0 5,17 * * *' (twice daily).
+    The cron schedule expression. Defaults to '0 5,17 * * *' (twice daily).
 
 .PARAMETER Timezone
-    The timezone identifier for Cloud Scheduler. Defaults to value in .env or 'Asia/Seoul'.
+    The timezone identifier for Cloud Scheduler. Defaults to 'Asia/Seoul'.
 
 .PARAMETER MaxEmails
-    Maximum emails to fetch per run. Defaults to value in .env or 20.
+    Maximum emails to fetch per run. Defaults to 20.
 
 .EXAMPLE
     .\deploy_cloud.ps1
@@ -62,48 +62,34 @@ param(
 $ErrorActionPreference = "Stop"
 
 # ==============================================================================
-# SECTION 1: Environment & Configuration Loading
+# SECTION 1: Cloud-Native Configuration Loading
 # ==============================================================================
 
-# Load configuration from .env file if present in workspace root
-if (Test-Path ".env") {
-    Write-Verbose "Loading environment variables from .env file..."
-    Get-Content .env | ForEach-Object {
-        if ($_ -match '^\s*([^#][^=]*)\s*=\s*(.*)$') {
-            $envKey = $matches[1].Trim()
-            $envVal = $matches[2].Trim()
-            Set-Variable -Name $envKey -Value $envVal -Scope Script
-        }
-    }
-}
-
-# Resolve target Project ID
+# Resolve target Project ID directly from arguments or gcloud config
 $TARGET_PROJECT = if ($ProjectId) { 
     $ProjectId 
-} elseif ($GCP_PROJECT_ID) { 
-    $GCP_PROJECT_ID 
 } else { 
     (gcloud config get-value project 2>$null).Trim() 
 }
 
 if (-not $TARGET_PROJECT -or $TARGET_PROJECT -eq "(unset)") {
-    Write-Error "GCP_PROJECT_ID is not configured. Specify -ProjectId, set in .env, or run 'gcloud config set project <ID>'."
+    Write-Error "GCP Project is not configured. Specify -ProjectId or run 'gcloud config set project <ID>'."
     exit 1
 }
 
-# Retrieve centralized defaults from src.config if not explicitly provided
+# Retrieve centralized defaults from src.config
 $CONFIG_DEFAULTS = try {
     py -3 -c "import json; from src.config import get_schedule, get_timezone, get_max_emails; print(json.dumps({'schedule': get_schedule(), 'timezone': get_timezone(), 'max_emails': get_max_emails()}))" 2>$null | ConvertFrom-Json
 } catch {
     $null
 }
 
-$TARGET_REGION = if ($Region) { $Region } elseif ($GCP_REGION) { $GCP_REGION } else { "asia-northeast1" }
-$TARGET_SERVICE = if ($ServiceName) { $ServiceName } elseif ($SERVICE_NAME) { $SERVICE_NAME } else { "gmail-agent" }
-$TARGET_JOB = if ($JobName) { $JobName } elseif ($JOB_NAME) { $JOB_NAME } else { "gmail-agent-daily-trigger" }
-$TARGET_SCHEDULE = if ($Schedule) { $Schedule } elseif ($SCHEDULE) { $SCHEDULE } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.schedule) { $CONFIG_DEFAULTS.schedule } else { "0 5,17 * * *" }
-$TARGET_TIMEZONE = if ($Timezone) { $Timezone } elseif ($TIMEZONE) { $TIMEZONE } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.timezone) { $CONFIG_DEFAULTS.timezone } else { "Asia/Seoul" }
-$TARGET_MAX_EMAILS = if ($MaxEmails) { $MaxEmails } elseif ($MAX_EMAILS) { $MAX_EMAILS } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.max_emails) { $CONFIG_DEFAULTS.max_emails } else { 20 }
+$TARGET_REGION = if ($Region) { $Region } else { "asia-northeast1" }
+$TARGET_SERVICE = if ($ServiceName) { $ServiceName } else { "gmail-agent" }
+$TARGET_JOB = if ($JobName) { $JobName } else { "gmail-agent-daily-trigger" }
+$TARGET_SCHEDULE = if ($Schedule) { $Schedule } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.schedule) { $CONFIG_DEFAULTS.schedule } else { "0 5,17 * * *" }
+$TARGET_TIMEZONE = if ($Timezone) { $Timezone } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.timezone) { $CONFIG_DEFAULTS.timezone } else { "Asia/Seoul" }
+$TARGET_MAX_EMAILS = if ($MaxEmails) { $MaxEmails } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.max_emails) { $CONFIG_DEFAULTS.max_emails } else { 20 }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " Deploying Gmail Agent to Google Cloud Run" -ForegroundColor Cyan
