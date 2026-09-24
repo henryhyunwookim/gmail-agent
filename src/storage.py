@@ -75,8 +75,8 @@ def _ensure_bucket_exists(client: Any, bucket_name: str, project_id: str | None)
     try:
         bucket = client.bucket(bucket_name)
         if not bucket.exists():
-            print(f"Bucket gs://{bucket_name} not found. Creating...")
-            client.create_bucket(bucket, project=project_id)
+            print(f"Bucket gs://{bucket_name} not found. Creating in {os.getenv('GCP_REGION', 'asia-northeast1')}...")
+            client.create_bucket(bucket, project=project_id, location=os.getenv("GCP_REGION", "asia-northeast1"))
             print(f"Created bucket gs://{bucket_name}.")
         return True
     except Exception:

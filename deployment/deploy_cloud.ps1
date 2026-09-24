@@ -125,6 +125,17 @@ gcloud services enable `
     secretmanager.googleapis.com `
     storage.googleapis.com
 
+# Ensure target Cloud Storage bucket exists in regional location
+$BUCKET_NAME = "$TARGET_PROJECT-gmail-agent-data"
+Write-Host "Ensuring Cloud Storage bucket gs://$BUCKET_NAME exists in $TARGET_REGION..." -ForegroundColor Cyan
+$bucketCheck = gcloud storage buckets describe "gs://$BUCKET_NAME" 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Creating Cloud Storage bucket gs://$BUCKET_NAME in $TARGET_REGION..."
+    gcloud storage buckets create "gs://$BUCKET_NAME" --location=$TARGET_REGION
+} else {
+    Write-Host "Cloud Storage bucket gs://$BUCKET_NAME already exists."
+}
+
 # ==============================================================================
 # SECTION 3: Cloud Run Deployment
 # ==============================================================================
