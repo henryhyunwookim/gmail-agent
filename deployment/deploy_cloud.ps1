@@ -56,7 +56,10 @@ param(
     [string]$Timezone,
 
     [Parameter(Mandatory = $false)]
-    [int]$MaxEmails
+    [int]$MaxEmails,
+
+    [Parameter(Mandatory = $false)]
+    [string]$TargetLearningLanguage
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,6 +93,7 @@ $TARGET_JOB = if ($JobName) { $JobName } else { "gmail-agent-daily-trigger" }
 $TARGET_SCHEDULE = if ($Schedule) { $Schedule } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.schedule) { $CONFIG_DEFAULTS.schedule } else { "0 5,17 * * *" }
 $TARGET_TIMEZONE = if ($Timezone) { $Timezone } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.timezone) { $CONFIG_DEFAULTS.timezone } else { "Asia/Seoul" }
 $TARGET_MAX_EMAILS = if ($MaxEmails) { $MaxEmails } elseif ($CONFIG_DEFAULTS -and $CONFIG_DEFAULTS.max_emails) { $CONFIG_DEFAULTS.max_emails } else { 20 }
+$TARGET_LANG = if ($TargetLearningLanguage) { $TargetLearningLanguage } elseif ($env:TARGET_LEARNING_LANGUAGE) { $env:TARGET_LEARNING_LANGUAGE } else { "Mandarin Chinese" }
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host " Deploying Gmail Agent to Google Cloud Run" -ForegroundColor Cyan
@@ -99,6 +103,7 @@ Write-Host " Region:    $TARGET_REGION"
 Write-Host " Service:   $TARGET_SERVICE"
 Write-Host " Schedule:  $TARGET_SCHEDULE ($TARGET_TIMEZONE)"
 Write-Host " Batch:     $TARGET_MAX_EMAILS emails/run"
+Write-Host " Language:  $TARGET_LANG"
 Write-Host "=========================================================="
 
 # ==============================================================================
@@ -144,7 +149,7 @@ Write-Host "`n[3/5] Deploying container image to Cloud Run..." -ForegroundColor 
 gcloud run deploy $TARGET_SERVICE `
     --source . `
     --region $TARGET_REGION `
-    --set-env-vars "GCP_PROJECT_ID=$TARGET_PROJECT,MAX_EMAILS=$TARGET_MAX_EMAILS" `
+    --update-env-vars "GCP_PROJECT_ID=$TARGET_PROJECT,MAX_EMAILS=$TARGET_MAX_EMAILS,TARGET_LEARNING_LANGUAGE=$TARGET_LANG" `
     --no-allow-unauthenticated `
     --quiet
 
