@@ -4,8 +4,8 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 ## Features
 
-- 📰 **Executive-Grade Intelligence Briefings**: Delivers deep architectural, technical, and strategic context, background significance, and practical takeaways calibrated to an AI & Cloud Solutions Architect.
-- 🧠 **Context-Aware Persona Alignment**: Synchronizes with user profile memory (e.g. AI & Cloud Solutions Architect), prioritizing Agentic AI, Cloud & Serverless architectures, Digital ODA, and enterprise tech while deprioritizing noise.
+- 📰 **Executive-Grade Intelligence Briefings**: Delivers deep technical, strategic, and domain-specific context, background significance, and practical takeaways tailored to your professional focus.
+- 🧠 **Context-Aware Persona Alignment**: Dynamically aligns with each user's configurable profile, role, and domain priorities (e.g. software engineering, research, leadership, or product management), prioritizing high-signal subject matter while filtering routine noise.
 - 🌐 **External Content & Media Ingestion**: Automatically detects linked web articles, YouTube videos (extracting audio transcripts), and podcasts, analyzing full source content beyond initial email previews.
 - 💡 **Deep-Dive Key Insights**: Breaks down emails and linked sources into rich, analytical thematic sections with specific facts, data points, and systems-level implications.
 - ⚡ **Actionable Takeaways**: Clearly highlights key next steps, decisions, and recommendations.
@@ -29,7 +29,7 @@ graph TD
         SecretMgr -->|gemini-api-key| Config[src/config.py]
         SecretMgr -->|gmail-agent-token| Auth[src/auth.py]
         SecretMgr -->|gmail-oauth-credentials| Auth
-        GCSMemory[GCS gs://...-linkedin-memory] -->|Persona Sync| Persona[src/persona.py]
+        GCSMemory[Optional Cloud Storage / Profile Memory] -->|Persona Sync| Persona[src/persona.py]
     end
 
     subgraph Google Cloud Platform
@@ -41,7 +41,7 @@ graph TD
         Main <-->|Read / Update Memory| GCSMem[Cloud Storage gs://...-gmail-agent-data/agent_memory.json]
     end
 
-    subgraph Cognitive Fast Execution Loop
+    subgraph Operational Pipeline (Per-Batch)
         Main -->|Auth & Ingest Unread| GmailClient[Gmail Client]
         Main -->|Analyze & Triage| Summarizer[AI Summarizer]
         Persona -->|Context & Focus Areas| Summarizer
@@ -52,7 +52,7 @@ graph TD
         GmailClient -->|Apply Smart Labels| GmailAPI
     end
 
-    subgraph Self-Improving Slow Reflection Loop
+    subgraph Continuous Reflection & Memory Loop
         GmailAPI -->|Harvest Stars & Label Changes| FeedbackEngine[Feedback Harvester]
         FeedbackEngine -->|Interaction History| MetaReflect[Gemini Meta-Reflection]
         MetaReflect -->|Synthesize Optimized Guidelines| GCSMem
@@ -68,7 +68,7 @@ graph TD
 | **API Keys & Secrets** (`GEMINI_API_KEY`) | **Google Cloud Secret Manager** | Secure string (`secrets/gemini-api-key`) | Dual-mode: Python SDK with fallback to authenticated `gcloud secrets versions access` CLI |
 | **OAuth Tokens** (`token.json`) | **Google Cloud Secret Manager** | Serialized JSON token (`secrets/gmail-agent-token`) | Auto-resolved when local file is missing; in-memory refresh with OS temp cache fallback |
 | **OAuth Client IDs** (`credentials.json`) | **Google Cloud Secret Manager** | Raw client secrets JSON (`secrets/gmail-oauth-credentials`) | Auto-downloaded in-memory on demand if interactive web browser login is triggered |
-| **User Persona Context** | **Google Cloud Storage (GCS)** | `gs://<project-id>-linkedin-memory/linkedin-ghostwriter/profile_memory.json` | Live persona synchronization with linkedin-post-ghostwriter; local temp cache and embedded baseline fallback |
+| **User Persona Context** | **Google Cloud Storage (GCS) / Local** | `gs://<project-id>-memory/user_profile.json` or local memory | Live persona synchronization with optional profile memory; local temp cache and embedded baseline fallback |
 | **Self-Improving Agent Memory** | **Google Cloud Storage (GCS)** | `gs://<project-id>-gmail-agent-data/gmail-agent/agent_memory.json` | Persistent learned guidelines, sender patterns, and interaction history; local temp cache fallback |
 | **Persistent State** (`state.json`) | **Google Cloud Storage (GCS)** | `gs://<project-id>-gmail-agent-data/gmail-agent/state.json` (`asia-northeast1`) | Regional bucket in Tokyo co-located with Cloud Run; single source of truth; local runs write fallbacks only to OS temp dir (`tempfile.gettempdir()`) |
 | **Operational & Audit Logs** (`run_log.json`) | **Google Cloud Storage & Cloud Logging** | `gs://<project-id>-gmail-agent-data/gmail-agent/run_log.json` + `stdout` | Decoupled from state; streamed to Cloud Logging on Cloud Run and GCS |
@@ -83,11 +83,11 @@ graph TD
 *   **AI Summarizer**: The cognitive intelligence layer that analyzes emails with Gemini 3.8 Flash, applying persona alignment, semantic triage, and adaptive language study extraction.
 *   **Agent Memory Manager**: Manages interaction history, implicit signal harvesting (starred messages, label adjustments), and autonomous prompt reflection.
 
-### Dual-Loop Logic Flow
+### Dual-Loop Architecture: Operational Pipeline & Continuous Reflection
 
-The application executes through a coordinated **Fast-Slow Cognitive Architecture**:
+The application operates through two coordinated, complementary mechanisms: an **Operational Pipeline** that triages and briefs incoming emails per batch, and a **Continuous Reflection Loop** that learns and self-optimizes from user interactions over time:
 
-#### 1. Fast Execution Pipeline (Per Batch)
+#### 1. Operational Pipeline (Per Batch Execution)
 1.  **Trigger & Auth**: The Cloud Scheduler triggers the container (or run manually/locally). The app authenticates with Gmail using OAuth 2.0.
 2.  **Fetch**: Retrieves unread emails from the inbox according to the configured batch limit (default: 20 emails, customizable via `MAX_EMAILS` or CLI).
 3.  **Echo Guard & Thread Protection**:
@@ -105,7 +105,7 @@ The application executes through a coordinated **Fast-Slow Cognitive Architectur
     *   **Unsubscribe Link**: Extracts RFC 2369 `List-Unsubscribe` headers or body links for convenient one-click opt-out.
     *   **Label**: Applies `ActionRequired` or `ReadLater` labels for rapid triage.
 
-#### 2. Slow Reflection Loop (Self-Improvement)
+#### 2. Continuous Reflection & Memory Loop (Self-Improvement)
 6.  **Signal Harvesting**: Inspects recent messages in Gmail to detect implicit human feedback (starred messages, spam/trash moves, manual label adjustments).
 7.  **Meta-Reflection**: Analyzes triage decisions against user feedback to synthesize 4–8 authoritative, non-redundant guidelines and prune stale hints.
 8.  **Memory Sync**: Saves the updated guidelines back to GCS (`agent_memory.json`) to guide future execution runs.

@@ -4,7 +4,7 @@ AI Email Summarization & Cognitive Triage Engine (`src.summarizer`)
 
 Purpose:
     Utilizes Google Gemini (Gemini 3.8 Flash) to analyze emails as an autonomous
-    executive assistant for Henry Hyunwoo Kim (AI & Cloud Solutions Architect).
+    executive assistant tailored to the user's professional persona.
 
 Agentic Capabilities:
     1. Unified Semantic Triage:
@@ -12,13 +12,12 @@ Agentic Capabilities:
        articles/newsletters, transactional receipts, service notifications, or noise,
        eliminating rigid, fragile keyword matching.
     2. Context-Aware Persona Alignment:
-       Injects the user's technical profile, expertise (Agentic AI, Cloud/Serverless,
-       Digital ODA, AI Ethics), and priority focus areas into every briefing.
-    3. Autonomous Chinese Language Detection & Study:
-       Dynamically identifies Chinese language content across email text and fetched
-       articles, automatically generating structured language learning breakdowns
-       (original, pinyin with tone marks, vocabulary, English translation) without
-       hardcoded sender domains.
+       Injects the user's professional profile, technical expertise, and priority
+       focus areas into every briefing.
+    3. Adaptive Language Learning & Detection:
+       Dynamically detects text in the user's configured target language across email
+       text and fetched articles, automatically generating structured language learning
+       breakdowns (original, pronunciation/phonetics, vocabulary, English translation).
     4. RFC-Compliant Unsubscribe & Link Intelligence:
        Prioritizes RFC 2369 List-Unsubscribe headers over heuristics, with full DOM
        and regex fallback.
@@ -212,17 +211,16 @@ class EmailSummarizer:
         Features:
             - Semantic Triage: Classifies email intent and determines optimal action
               (forward_briefing, skip_receipt, skip_noise).
-            - Persona Context: Tailors insights to Henry Hyunwoo Kim's technical focus
-              (Agentic AI, Cloud/Serverless, Digital ODA, AI Ethics).
-            - Autonomous Chinese Detection: Automatically creates Chinese study segments
-              whenever Chinese content is detected, without hardcoded sender rules.
+            - Persona Context: Tailors insights to the user's technical focus and priority domains.
+            - Adaptive Language Detection: Automatically creates language study segments
+              whenever content in the user's configured target language is detected.
             - External Source Ingestion: Enriches preview emails with external articles
               or YouTube transcripts when relevant.
 
         Args:
             email_content: Dictionary containing 'subject', 'sender', 'body', 'html_body',
                 and optional 'list_unsubscribe'.
-            include_translation: Optional explicit override for Chinese study breakdown.
+            include_translation: Optional explicit override for language study breakdown.
                 If None, dynamically detected from content.
 
         Returns:

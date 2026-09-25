@@ -3,19 +3,18 @@ User Persona & Cognitive Context Module (`src.persona`)
 ======================================================
 
 Purpose:
-    Maintains the persistent persona and technical context of the user
-    (Henry Hyunwoo Kim, AI & Cloud Solutions Architect), synchronizing
-    with the profile memory maintained by `linkedin-post-ghostwriter`
-    via Google Cloud Storage and providing domain-aware guidance for
-    email intelligence, relevance evaluation, and Chinese language study.
+    Maintains the persistent persona and technical context of the user,
+    supporting optional profile synchronization (e.g. from Google Cloud Storage
+    or local cache) and providing domain-aware guidance for email intelligence,
+    relevance evaluation, and adaptive language study.
 
 Architecture & Portability:
     1. Attempts to load live persona memory from Google Cloud Storage
-       (`gs://<PROJECT_ID>-linkedin-memory/linkedin-ghostwriter/profile_memory.json`).
+       (`gs://<PROJECT_ID>-memory/user_profile.json` or profile memory).
     2. Falls back to OS temporary cache if available.
     3. Guarantees 100% standalone operation via embedded baseline persona.
-    4. Automatically detects Chinese language content to trigger educational
-       language study breakdowns for the user.
+    4. Automatically detects target language content to trigger educational
+       language study breakdowns when configured by the user.
 """
 from __future__ import annotations
 
@@ -30,36 +29,34 @@ from typing import Any
 from src.config import get_project_id
 
 
-# Canonical default persona baseline matching linkedin-post-ghostwriter
+# Canonical default persona baseline (configurable per user)
 _DEFAULT_PERSONA: dict[str, Any] = {
-    "name": "Henry Hyunwoo Kim",
-    "headline": "AI & Cloud Solutions Architect | Digital Transformation & ODA",
+    "name": "User",
+    "headline": "Technology Professional & Solutions Architect",
     "about": (
-        "Focusing on AI innovation, digital capacity building, and international "
-        "development cooperation across Korea, Japan, and developing nations."
+        "Focusing on software innovation, scalable cloud systems, and modern AI architectures."
     ),
     "expertise_areas": [
+        "Software Engineering & Cloud Architecture",
         "Generative AI & Agentic Systems",
-        "Cloud Architecture & Serverless Deployments",
-        "International Cooperation & Digital ODA (KOICA/JICA/UN)",
-        "AI Ethics, Policy, and Digital Inclusion",
+        "Distributed Systems & APIs",
+        "System Security & Reliability",
     ],
     "language_focus": {
-        "fluent": ["Korean", "English", "Japanese"],
+        "fluent": ["English"],
         "learning": None,  # Configurable per user (e.g. 'Mandarin Chinese', 'Spanish', 'Japanese', None)
     },
     "prioritized_themes": [
-        "Agentic AI workflows and system architectures",
-        "Serverless, cloud computing, and distributed systems",
-        "Enterprise technology strategy and digital transformation",
-        "Digital ODA, international cooperation, and multilateral initiatives",
-        "High-signal technical newsletters and deep-dive publications",
+        "System architectures, engineering practices, and technical roadmaps",
+        "Cloud computing, infrastructure, and distributed services",
+        "Technology strategy, product developments, and digital transformation",
+        "High-signal technical newsletters, research papers, and deep-dive publications",
     ],
     "deprioritized_themes": [
         "Unsolicited sales pitches and cold outreach",
         "Routine transactional receipts and automated delivery notices",
         "Generic political polemics and unverified rumors",
-        "Shallow motivational posts without technical or practical substance",
+        "Shallow promotional content without technical or practical substance",
     ],
 }
 
