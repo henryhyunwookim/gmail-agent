@@ -32,6 +32,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from src.auth import authenticate_gmail
+from src.briefing import compose_briefing
 from src.config import (
     DEFAULT_MAX_EMAILS,
     get_gemini_api_key,
@@ -145,7 +146,8 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                 thread_id = msg.get("threadId")
                 if thread_id and client.thread_has_summary(thread_id, user_email):
                     stats["already_summarized"] += 1
-                    print("Skipping - thread already contains a forwarded summary.")
+                    client.mark_as_read(msg_id)
+                    print("Skipping - thread already contains a forwarded summary. Marked as read.")
                     continue
 
                 # Filter 4b: Self-sent check
@@ -156,6 +158,7 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
 
                 if user_email.lower() in sender_email.lower():
                     stats["self_sent"] += 1
+                    client.mark_as_read(msg_id)
                     print(f"Skipping email from self: {sender_email}")
                     continue
 
@@ -181,120 +184,8 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                 if ext_sources:
                     print(f"External Sources Ingested: {len(ext_sources)}")
 
-                # Stage 6: Construct Rich Executive Intelligence Briefing
-                # 6a: Deep-Dive Key Insights
-                insights_section = ""
-                key_insights = analysis.get("key_insights") or []
-                if not key_insights and analysis.get("sections"):
-                    key_insights = [
-                        {"topic": s.get("topic", "Insight"), "details": s.get("insight", "")}
-                        for s in analysis.get("sections", [])
-                    ]
-
-                if key_insights:
-                    insights_lines = []
-                    for ki in key_insights:
-                        topic = ki.get("topic", "Theme")
-                        details = ki.get("details", "")
-                        insights_lines.append(f"• [{topic}]\n  {details}")
-                    insights_section = (
-                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        "🔍 DEEP-DIVE KEY INSIGHTS\n"
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        + "\n\n".join(insights_lines)
-                    )
-
-                # 6b: External Source Highlights (Articles, YouTube, Podcasts)
-                external_highlights_section = ""
-                ext_highlights = analysis.get("external_source_highlights")
-                if ext_highlights and ext_highlights.strip() and ext_highlights.lower() != "null":
-                    external_highlights_section = (
-                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        "🌐 EXTERNAL SOURCE INSIGHTS (Full Article / Video / Audio)\n"
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        f"{ext_highlights.strip()}"
-                    )
-
-                # 6c: Actionable Takeaways & Next Steps
-                takeaways_section = ""
-                takeaways = analysis.get("actionable_takeaways") or []
-                if takeaways:
-                    takeaways_lines = [f"• {t}" for t in takeaways]
-                    takeaways_section = (
-                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        "⚡ ACTIONABLE TAKEAWAYS\n"
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        + "\n".join(takeaways_lines)
-                    )
-
-                # 6d: Chinese Study Corner (for FTChinese)
-                translation_section = ""
-                if is_ftchinese and analysis.get("learning_segments"):
-                    translation_section = (
-                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        "📚 CHINESE STUDY CORNER\n"
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                    )
-                    for i, segment in enumerate(analysis["learning_segments"], 1):
-                        if i > 5:
-                            break
-                        translation_section += f"\n[Sentence {i}]\n"
-                        translation_section += f"Original:    {segment.get('original', '')}\n"
-                        translation_section += f"Pinyin:      {segment.get('pinyin', '')}\n"
-                        translation_section += f"Translation: {segment.get('translation', '')}\n"
-                        if segment.get("vocabulary"):
-                            translation_section += "Vocabulary:\n"
-                            for vocab in segment["vocabulary"]:
-                                translation_section += (
-                                    f"  • {vocab.get('word', '')}: {vocab.get('pinyin', '')} - {vocab.get('english', '')}\n"
-                                )
-
-                # 6e: Referenced External Sources & Unsubscribe Links
-                sources_section = ""
-                src_lines = []
-                for src in ext_sources:
-                    src_title = src.get("title", "")
-                    src_url = src.get("url", "")
-                    src_type = src.get("type", "link").upper()
-                    if src_title:
-                        src_lines.append(f"• [{src_type}] {src_title}: {src_url}")
-                    else:
-                        src_lines.append(f"• [{src_type}] {src_url}")
-
-                if analysis.get("unsubscribe_link"):
-                    src_lines.append(f"• [UNSUBSCRIBE] {analysis['unsubscribe_link']}")
-
-                if src_lines:
-                    sources_section = (
-                        "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        "🔗 REFERENCED SOURCES & LINKS\n"
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                        + "\n".join(src_lines)
-                    )
-
-                # 6f: Action Status Block
-                action_status = "YES ⚠️" if analysis.get("action_required") else "NO"
-                action_reason = analysis.get("reason", "No action needed.")
-
-                summary_text = f"""
-================================================================================
-📰 EXECUTIVE INTELLIGENCE BRIEFING
-================================================================================
-📌 Subject: {content.get('subject')}
-👤 Sender:  {content.get('sender')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 EXECUTIVE SUMMARY & CONTEXT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{exec_summary}{insights_section}{external_highlights_section}{takeaways_section}{translation_section}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 ACTION STATUS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Action Required: {action_status}
-Reason: {action_reason}{sources_section}
-================================================================================
-"""
+                # Stage 6: Compose a concise briefing before the forwarded email.
+                summary_text = compose_briefing(content, analysis, include_translation=is_ftchinese)
 
                 # Stage 6 (cont): Dispatch Forward or Simulate Dry-Run
                 if dry_run:
@@ -308,6 +199,7 @@ Reason: {action_reason}{sources_section}
                     # Categorize message with appropriate Gmail label
                     label = "ActionRequired" if analysis.get("action_required") else "ReadLater"
                     client.add_label(msg_id, label)
+                    client.mark_as_read(msg_id)
                     stats["processed"] += 1
                     print("Done.")
 

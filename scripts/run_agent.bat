@@ -8,12 +8,12 @@ REM   to 'logs/agent.log'. Designed to be invoked manually or automatically via
 REM   Windows Task Scheduler.
 REM
 REM Behavior:
-REM   1. Changes working directory to this script's directory (%~dp0).
+REM   1. Changes working directory to project root (%~dp0..).
 REM   2. Ensures the local 'logs' directory exists.
 REM   3. Runs 'python -m src.main' redirecting stdout and stderr.
 REM ==============================================================================
 
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 REM Ensure logging directory exists
 if not exist "logs" (

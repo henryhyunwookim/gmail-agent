@@ -205,4 +205,4 @@ Write-Host " Deployment Complete!" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host "Service URL: $SERVICE_URL"
 Write-Host "Schedule:    $TARGET_SCHEDULE ($TARGET_TIMEZONE)"
-Write-Host "Next Step:   Synchronize OAuth credentials via: python sync_secrets.py"
+Write-Host "Next Step:   Synchronize OAuth credentials via: python deployment/sync_secrets.py"

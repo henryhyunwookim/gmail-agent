@@ -95,75 +95,43 @@ The application follows a linear execution pipeline, optimized for batch process
 
 ## Example Output
 
-Here's how an incoming email looks when processed by the agent:
-
-**Original Email:**
-
-```email
-From: Sarah Jones (via Project Alpha Updates) <sarah.jones@example.com>
-Subject: Project Alpha Update & Q4 Planning
-
-Hi everyone, quick update on Project Alpha. The backend API is finally complete 
-and all tests are passing! However, we're hitting some snags with the frontend 
-integration—specifically around the new auth flow. We likely need another 2 days 
-to iron that out. Also, we really need to lock down the Q4 roadmap. Can we meet 
-next Tuesday at 2 PM to go over the proposed features? Let me know if that works.
-
-[You are receiving this because you are subscribed to Project Alpha Updates. Unsubscribe]
-```
-
-**Agent's Executive Intelligence Briefing:**
+An anonymized example based on a real newsletter message. Names, organizations,
+and links are generalized:
 
 ```text
-================================================================================
-📰 EXECUTIVE INTELLIGENCE BRIEFING
-================================================================================
-📌 Subject: Project Alpha Update & Q4 Planning
-👤 Sender:  Sarah Jones (via Project Alpha Updates) <sarah.jones@example.com>
+Subject: Making business travel count
+From: Professional newsletter
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 EXECUTIVE SUMMARY & CONTEXT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Sarah Jones reports that the backend API for Project Alpha has achieved full 
-test coverage and reached production completion. However, client-side rollout is 
-experiencing a brief 48-hour delay stemming from OAuth token refresh edge-cases 
-in the new authentication flow. In parallel, team leadership is finalizing the 
-Q4 engineering roadmap to prioritize incoming feature requests.
+💡 Summary & insights
+The main interview argues that business travel can build relationships and
+professional perspective, rather than being only a sequence of meetings. It
+connects trip quality to intentional planning, adequate rest, and opportunities
+to experience a destination. The wider newsletter also covers career and
+workplace developments.
+- Retention signal: Nearly 60% of business travelers add personal days to work
+  trips. The interview frames this as a potential morale and retention benefit
+  because the employer's flight is already paid for.
+- Sustainable itineraries: Back-to-back meetings and poor sleep reduce the
+  value of travel; protected downtime and local exploration can support energy
+  and more meaningful engagement.
+- Small-business friction: Self-booking owners lose time comparing options.
+  Faster rebooking and preference-aware lodging address a practical
+  productivity cost for teams without travel departments.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 DEEP-DIVE KEY INSIGHTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• [Backend Architecture]: Core REST endpoints are fully deployed with automated 
-  CI test suites passing.
-• [Frontend Auth Bottleneck]: Integration roadblock isolated to state 
-  synchronization in the revised OAuth flow; estimated resolution within 2 working days.
-• [Q4 Milestone Scheduling]: Team planning session proposed for Tuesday at 
-  2:00 PM to lock down quarterly feature delivery commitments.
+🌐 External source findings
+The linked newsletter page adds publication and archive context, placing this
+interview within recurring coverage of career moves, professional learning,
+and industry trends.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🌐 EXTERNAL SOURCE INSIGHTS (Full Article / Video / Audio)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Video demo demonstrates the new multi-tenant auth architecture and interactive 
-dashboard prototype.
+⚡ Takeaways
+- Separate essential work commitments from optional recovery and exploration
+  time when planning business itineraries.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ ACTIONABLE TAKEAWAYS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Confirm availability for the Q4 planning meeting on Tuesday at 2:00 PM.
-• Review frontend auth branch PR before Wednesday's scheduled merge window.
+🎯 Action required: No
+Reason: Informational newsletter; no reply or task requested.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 ACTION STATUS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Action Required: YES ⚠️
-Reason: Needs calendar confirmation for the proposed planning meeting time.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔗 REFERENCED SOURCES & LINKS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• [YOUTUBE] Project Alpha Walkthrough: https://youtube.com/watch?v=...
-• [UNSUBSCRIBE] https://example.com/unsubscribe
-================================================================================
+🔗 Links
+- Unsubscribe: [redacted]
 ```
 
 ## 🎨 Personalization Showcase
@@ -232,7 +200,7 @@ your_gemini_api_key_here
 EOF
 ```
 
-*(Alternatively, run `python sync_secrets.py` to synchronize any existing local keys/tokens directly into Secret Manager).*
+*(Alternatively, run `python deployment/sync_secrets.py` to synchronize any existing local keys/tokens directly into Secret Manager).*
 
 ### 5. Authenticate Gmail
 
@@ -433,7 +401,7 @@ If you generate or obtain new local credentials and need to seed Secret Manager:
 
 ```powershell
 # Sync token.json, credentials.json, and GEMINI_API_KEY to Secret Manager in one shot
-python sync_secrets.py
+python deployment/sync_secrets.py
 ```
 
 ## Project Structure
@@ -446,8 +414,6 @@ gmail-agent/
 ├── LICENSE                 # Project license
 ├── README.md               # Production architecture & onboarding guide
 ├── requirements.txt        # Python dependencies (includes cloud secret & storage SDKs)
-├── run_agent.bat           # Windows executable & Task Scheduler launcher
-├── sync_secrets.py         # Convenience CLI entry point for secret synchronization
 ├── deployment/
 │   ├── DEPLOYMENT.md       # Multi-platform deployment guide
 │   ├── deploy_cloud.ps1    # Automated Cloud Run & Cloud Scheduler deployment script
@@ -455,10 +421,13 @@ gmail-agent/
 │   └── upload_token.ps1    # Token upload utility
 ├── docs/
 │   └── assets/             # Architecture overview diagrams & documentation assets
+├── scripts/
+│   └── run_agent.bat       # Windows executable & Task Scheduler launcher
 └── src/
     ├── __init__.py         # Package marker & exported module declarations
     ├── app.py              # Flask HTTP webhook entry point for Cloud Run
     ├── auth.py             # Dual-mode multi-PC Gmail OAuth 2.0 resolver
+    ├── briefing.py         # Concise plain-text email briefing formatter
     ├── config.py           # Centralized configuration & Secret Manager resolution
     ├── content_fetcher.py  # Multi-modal web, YouTube, podcast content scraper & login guards
     ├── gmail_client.py     # Gmail API client & RFC 822 MIME message builder
@@ -498,7 +467,7 @@ The system is designed with a **cloud-native, zero-local-credentials** architect
 ### "could not locate runnable browser" (Headless / Cloud Run Auth Error)
 - Do not run interactive OAuth on headless Cloud Run.
 - Authenticate locally first: `python -m src.auth`
-- Synchronize token to Secret Manager: `python sync_secrets.py` (or `.\deployment\upload_token.ps1`). Cloud Run resolves the token directly from Secret Manager at runtime without rebuilding containers.
+- Synchronize token to Secret Manager: `python deployment/sync_secrets.py` (or `.\deployment\upload_token.ps1`). Cloud Run resolves the token directly from Secret Manager at runtime without rebuilding containers.
 
 ### "Error 403: access_denied" (OAuth Blocked)
 - Ensure your email is added to the **Test Users** list in the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent) settings.

@@ -234,9 +234,9 @@ class EmailSummarizer:
                 if fetched.get("success") and fetched.get("content"):
                     fetched_sources.append(fetched)
                     external_context += (
-                        f"\n\n=== EXTERNAL SOURCE CONTENT ({ltype.upper()}): {url} ===\n"
+                        f"\n\nExternal source ({ltype.upper()}): {url}\n"
                         f"{fetched.get('content', '')[:15000]}\n"
-                        f"=== END EXTERNAL SOURCE ===\n"
+                        "End external source.\n"
                     )
 
         # Step 2: Body length resolution
@@ -245,8 +245,7 @@ class EmailSummarizer:
 
         # Step 3: Construct AI Prompt
         if include_translation:
-            prompt = f"""You are an intelligent executive analyst and Chinese language education specialist.
-Analyze the following FTChinese email (and any fetched external article content) and provide a comprehensive, high-value newsletter briefing along with a structured Chinese study breakdown.
+            prompt = f"""Analyze this FTChinese email and any fetched article content. Write a concise but substantive briefing that preserves useful context, evidence, nuance, and implications, plus the requested Chinese study material.
 
 Email Subject: {email_content.get('subject', '')}
 Email Sender: {email_content.get('sender', '')}
@@ -256,16 +255,15 @@ Email Content:
 
 IMPORTANT: You must respond with ONLY valid JSON in this exact structure (no markdown fences, no explanatory preamble):
 {{
-    "executive_summary": "A rich, comprehensive 2-3 paragraph executive briefing that provides full context, explains the narrative or developments, why it matters, and the big-picture significance.",
+    "executive_summary": "A substantive 3-5 sentence synthesis of the narrative, relevant background, and stakes; reserve figures, examples, and detailed evidence for the insights.",
     "key_insights": [
         {{
-            "topic": "Specific Topic or Theme",
-            "details": "Detailed, deep-dive explanation with facts, data, arguments, or policy implications."
+            "topic": "Short topic",
+            "details": "An evidence-based analysis of a distinct mechanism, tension, consequence, or implication, with enough context to explain why it matters."
         }}
     ],
     "actionable_takeaways": [
-        "Key takeaway or strategic implication 1",
-        "Key takeaway or strategic implication 2"
+        "Optional practical recommendation or implication grounded in the source"
     ],
     "action_required": false,
     "reason": "Brief explanation of why action is or isn't required",
@@ -282,16 +280,19 @@ IMPORTANT: You must respond with ONLY valid JSON in this exact structure (no mar
 }}
 
 Rules:
-- executive_summary: A thorough briefing (not a one-liner). Provide necessary background, who/what is involved, and why it matters.
-- key_insights: Provide 2-5 detailed, nuanced thematic insights. Each insight must offer meaningful depth, facts, and analysis.
-- actionable_takeaways: 2-4 strategic takeaways, implications, or lessons from the content.
+- Keep distinct roles: the summary explains the narrative, context, and stakes; insights interpret concrete evidence and implications; takeaways state practical next steps.
+- Reserve specific figures and examples for insights instead of repeating them in the summary. Each insight should add a different evidence-backed angle.
+- Preserve decision-relevant context, figures, examples, caveats, and causal links. Reduce repetition, not analysis; do not pad to a target length.
+- key_insights: Usually provide 2-4 substantive insights for a complex newsletter and fewer for a simple email. Give each 1-3 sentences with evidence and why it matters.
+- actionable_takeaways: Return 0-3 useful recommendations that are distinct from the insights; use an empty array when none adds value.
 - action_required: true if the email requires a reply, approval, or task from the recipient, false otherwise.
 - reason: Brief one-sentence explanation.
-- learning_segments: Break the email body down sentence by sentence for the first 5 distinct sentences of the main article content (exclude ads, promotions, footer links). Provide original Chinese, pinyin with tone marks, up to 3 vocabulary words, and English translation.
+- learning_segments: Cover up to the first 5 distinct sentences of main article text (exclude ads, promotions, and footer links). Include original Chinese, pinyin with tone marks, up to 3 vocabulary words, and English translation.
+- Use only source-supported facts; do not infer details or inflate significance.
 - Output ONLY the JSON object, nothing else.
 """
         else:
-            prompt = f"""You are an intelligent executive analyst. Analyze the following email (and any fetched external source content such as full articles, YouTube transcripts, or podcast notes) to produce a high-value, insightful, and comprehensive executive newsletter briefing.
+            prompt = f"""Analyze this email and any fetched external content. Produce a concise but substantive briefing: preserve meaningful context, evidence, nuance, and implications while removing repetition.
 
 Email Subject: {email_content.get('subject', '')}
 Email Sender: {email_content.get('sender', '')}
@@ -301,29 +302,31 @@ Email Content:
 
 IMPORTANT: You must respond with ONLY valid JSON in this exact structure (no markdown fences, no explanatory preamble):
 {{
-    "executive_summary": "A rich, comprehensive 2-3 paragraph briefing that gives full context, explains the narrative or developments, why it matters, and the big-picture significance.",
+    "executive_summary": "A substantive 3-5 sentence synthesis of the narrative, relevant background, and stakes; reserve figures, examples, and detailed evidence for the insights.",
     "key_insights": [
         {{
-            "topic": "Specific Topic or Theme",
-            "details": "Detailed, deep-dive explanation with facts, data, arguments, quotes, or technical details derived from the email and any external source."
+            "topic": "Short topic",
+            "details": "An evidence-based analysis of a distinct mechanism, tension, consequence, or implication, with enough context to explain why it matters."
         }}
     ],
-    "external_source_highlights": "If external links (article, video transcript, audio) were provided and analyzed, synthesize the valuable details, arguments, or demonstrations discovered beyond the email preview. If no external sources were present or fetched, return null.",
+    "external_source_highlights": "A substantive synthesis of useful evidence, examples, arguments, or caveats found in fetched sources but missing from the email preview; otherwise null.",
     "actionable_takeaways": [
-        "Key takeaway, practical recommendation, or strategic implication 1",
-        "Key takeaway, practical recommendation, or strategic implication 2"
+        "Optional practical recommendation or implication grounded in the source"
     ],
     "action_required": false,
     "reason": "Brief explanation of why action is or isn't required"
 }}
 
 Rules:
-- executive_summary: A thorough executive overview (not a short 1-sentence one-liner). Provide context, background, and significance.
-- key_insights: Provide 2-5 detailed, substantive thematic insights with supporting evidence and specifics.
-- external_source_highlights: Highlight valuable information extracted from external sources if present; otherwise null.
-- actionable_takeaways: 2-4 actionable takeaways or key implications.
+- Keep distinct roles: the summary explains the narrative, context, and stakes; insights interpret concrete evidence and implications; source highlights add material available only in fetched content; takeaways state practical next steps.
+- Reserve specific figures and examples for insights instead of repeating them in the summary. Each insight should add a different evidence-backed angle.
+- Preserve decision-relevant context, figures, examples, caveats, and causal links. Reduce repetition, not analysis; do not pad to a target length.
+- key_insights: Usually provide 2-4 substantive insights for a complex newsletter and fewer for a simple email. Give each 1-3 sentences with evidence and why it matters.
+- external_source_highlights: Explain what the fetched source adds beyond the email. Do not claim to have read a source unless its content was fetched successfully; otherwise return null.
+- actionable_takeaways: Return 0-3 useful recommendations that are distinct from the insights; use an empty array when none adds value.
 - action_required: true if the email requires a response, decision, or action from the recipient, false otherwise.
 - reason: Brief one-sentence explanation.
+- Use only source-supported facts; do not infer details or inflate significance.
 - Output ONLY the JSON object, nothing else.
 """
 

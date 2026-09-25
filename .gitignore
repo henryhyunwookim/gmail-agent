@@ -33,7 +33,16 @@ build/
 .mypy_cache/
 .ruff_cache/
 .coverage
-htmlcov/
+# --- Local Tests & Test Artifacts (NEVER COMMIT) ---
+tests/
+test/
+__tests__/
+spec/
+*.test.*
+*.spec.*
+test_*.py
+*_test.py
+conftest.py
 
 # --- IDE & Editor Settings ---
 .vscode/

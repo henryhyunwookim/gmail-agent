@@ -7,16 +7,16 @@ This guide covers multiple approaches to deploy your Gmail agent for real-time i
 
 ### Setup Steps
 
-1. **Create a batch file** to run the agent:
+1. **Inspect the batch file** to run the agent:
 
-Create `run_agent.bat` in your project directory:
+The workspace includes `scripts/run_agent.bat`:
 ```batch
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0.."
 python -m src.main >> logs/agent.log 2>&1
 ```
 
-> **Note**: `%~dp0` automatically uses the directory where the batch file is located.
+> **Note**: `%~dp0..` automatically resolves the project root directory.
 
 2. **Create logs directory**:
 ```bash
@@ -45,7 +45,7 @@ mkdir logs
    - **Actions tab**:
      - Click "New"
      - Action: "Start a program"
-     - Program/script: `C:\path\to\gmail-agent\run_agent.bat`
+     - Program/script: `C:\path\to\gmail-agent\scripts\run_agent.bat`
      - Start in: `C:\path\to\gmail-agent`
      
      > **Note**: Replace `C:\path\to\gmail-agent` with your actual project path.
@@ -209,10 +209,10 @@ Get-Content logs\agent.log -Wait -Tail 20
 ```
 
 ### Log rotation
-Add to `run_agent.bat`:
+Add to `scripts/run_agent.bat`:
 ```batch
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 REM Rotate logs if > 10MB
 for %%A in (logs\agent.log) do if %%~zA gtr 10485760 (

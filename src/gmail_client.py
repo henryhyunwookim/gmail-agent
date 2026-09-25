@@ -74,7 +74,7 @@ class GmailClient:
             results = (
                 self.service.users()
                 .messages()
-                .list(userId="me", q="is:unread", maxResults=limit)
+                .list(userId="me", q="is:unread -from:me", maxResults=limit)
                 .execute()
             )
             messages = results.get("messages", [])

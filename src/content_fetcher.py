@@ -35,6 +35,7 @@ import requests
 TRACKING_PARAMS: set[str] = {
     "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
     "gclid", "fbclid", "mc_cid", "mc_eid", "ref", "source",
+    "trk", "trkemail", "lipi", "midtoken", "midsig", "eid",
 }
 
 # Domains and path patterns that represent noise, auth barriers, or tracking
@@ -118,6 +119,22 @@ class ContentFetcher:
         ))
         return cleaned
 
+    @staticmethod
+    def _is_supported_linkedin_content_url(url: str) -> bool:
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        path = parsed.path.lower()
+        is_linkedin_host = host == "linkedin.com" or host.endswith(".linkedin.com")
+        is_article_path = path.startswith((
+            "/comm/pulse/",
+            "/pulse/",
+            "/comm/newsletters/",
+            "/newsletters/",
+            "/comm/posts/",
+            "/posts/",
+        ))
+        return is_linkedin_host and is_article_path
+
     def is_candidate_content_url(self, url: str, anchor_text: str = "") -> bool:
         """
         Evaluates whether a URL points to substantive content rather than administrative noise
@@ -139,7 +156,7 @@ class ContentFetcher:
         # Check ignored domains
         parsed = urlparse(url_lower)
         netloc = parsed.netloc
-        if any(ignored in netloc for ignored in IGNORED_DOMAINS):
+        if any(ignored in netloc for ignored in IGNORED_DOMAINS) and not self._is_supported_linkedin_content_url(url_lower):
             return False
 
         # Ignore obvious binary asset extensions
@@ -203,16 +220,13 @@ class ContentFetcher:
             List of dictionaries with 'url', 'type', 'anchor_text', and 'score'.
         """
         candidates: list[dict[str, Any]] = []
-        seen_urls: set[str] = set()
+        seen_candidates: dict[str, dict[str, Any]] = {}
 
         # Helper to register candidate
         def add_candidate(raw_url: str, text: str) -> None:
             if not self.is_candidate_content_url(raw_url, text):
                 return
             norm_url = self.normalize_url(raw_url)
-            if norm_url in seen_urls:
-                return
-            seen_urls.add(norm_url)
 
             link_type = self.classify_url(norm_url)
             score = 1.0
@@ -221,8 +235,8 @@ class ContentFetcher:
             text_lower = text.lower()
             intent_keywords = [
                 "read more", "full article", "read post", "read on", "continue reading",
-                "watch video", "watch now", "listen to", "episode", "view article",
-                "deep dive", "read online",
+                "keep reading", "read on linkedin", "watch video", "watch now",
+                "listen to", "episode", "view article", "deep dive", "read online",
             ]
             if any(kw in text_lower for kw in intent_keywords):
                 score += 3.0
@@ -230,13 +244,25 @@ class ContentFetcher:
                 score += 2.0
             elif link_type == "podcast":
                 score += 1.5
+            elif "/pulse/" in norm_url or "/comm/pulse/" in norm_url:
+                score += 2.0
 
-            candidates.append({
+            if norm_url in seen_candidates:
+                existing = seen_candidates[norm_url]
+                if score > existing["score"]:
+                    existing["score"] = score
+                if text.strip() and not existing["anchor_text"]:
+                    existing["anchor_text"] = text.strip()[:80]
+                return
+
+            candidate = {
                 "url": norm_url,
                 "type": link_type,
                 "anchor_text": text.strip()[:80],
                 "score": score,
-            })
+            }
+            seen_candidates[norm_url] = candidate
+            candidates.append(candidate)
 
         # Step 1: Parse HTML DOM anchors if HTML is provided
         if email_body_html and ("<html" in email_body_html.lower() or "<a " in email_body_html.lower()):
@@ -252,6 +278,16 @@ class ContentFetcher:
             for match in re.finditer(url_pattern, email_body_text):
                 found_url = match.group(0).rstrip(".,;!?:")
                 add_candidate(found_url, "")
+
+        # If specific articles are found, filter out generic newsletter series hub pages
+        has_specific_article = any(
+            "/pulse/" in c["url"] or "/comm/pulse/" in c["url"] for c in candidates
+        )
+        if has_specific_article:
+            candidates = [
+                c for c in candidates
+                if not ("/newsletters/" in c["url"] or "/comm/newsletters/" in c["url"])
+            ]
 
         # Sort by score descending and return top candidates
         candidates.sort(key=lambda c: c["score"], reverse=True)
@@ -391,7 +427,10 @@ class ContentFetcher:
             # Guard 1: Detect redirect to login / authentication portal
             final_url = resp.url.lower()
             parsed_final = urlparse(final_url)
-            if any(auth_domain in parsed_final.netloc for auth_domain in IGNORED_DOMAINS):
+            if (
+                any(auth_domain in parsed_final.netloc for auth_domain in IGNORED_DOMAINS)
+                and not self._is_supported_linkedin_content_url(final_url)
+            ):
                 print(f"[FETCH] Skipping '{url}': Redirected to login/auth domain '{parsed_final.netloc}'.")
                 return {
                     "url": url,
