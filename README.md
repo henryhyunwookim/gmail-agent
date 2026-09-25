@@ -23,42 +23,42 @@ The system is designed as a fully cloud-native, self-improving multi-PC applicat
 ![Gmail Agent Architecture & Workflow Overview](docs/assets/architecture_overview.png)
 
 ```mermaid
-graph TD
-    subgraph Multi-PC Resolution & Context Layer
-        GCPAuth[gcloud auth login / ADC] --> SecretMgr[Secret Manager]
-        SecretMgr -->|gemini-api-key| Config[src/config.py]
-        SecretMgr -->|gmail-agent-token| Auth[src/auth.py]
-        SecretMgr -->|gmail-oauth-credentials| Auth
-        GCSMemory[Optional Cloud Storage / Profile Memory] -->|Persona Sync| Persona[src/persona.py]
+flowchart TD
+    subgraph MultiPC ["Multi-PC Resolution & Context Layer"]
+        GCPAuth["gcloud auth login / ADC"] --> SecretMgr["Secret Manager"]
+        SecretMgr -->|"gemini-api-key"| Config["src/config.py"]
+        SecretMgr -->|"gmail-agent-token"| Auth["src/auth.py"]
+        SecretMgr -->|"gmail-oauth-credentials"| Auth
+        GCSMemory["Optional Cloud Storage / Profile Memory"] -->|"Persona Sync"| Persona["src/persona.py"]
     end
 
-    subgraph Google Cloud Platform
-        Scheduler[Cloud Scheduler] -->|Trigger via Configured Cron| CloudRun[Cloud Run Service]
-        CloudRun -->|Runs| App[Flask App]
-        App -->|Executes| Main[Main Pipeline]
-        Main -->|Operational Logs| GCSLogs[Cloud Storage gs://...-gmail-agent-data/run_log.json]
-        Main -->|Structured Logs| CloudLogging[GCP Cloud Logging]
-        Main <-->|Read / Update Memory| GCSMem[Cloud Storage gs://...-gmail-agent-data/agent_memory.json]
+    subgraph GCP ["Google Cloud Platform"]
+        Scheduler["Cloud Scheduler"] -->|"Trigger via Configured Cron"| CloudRun["Cloud Run Service"]
+        CloudRun -->|"Runs"| App["Flask App"]
+        App -->|"Executes"| Main["Main Pipeline"]
+        Main -->|"Operational Logs"| GCSLogs["Cloud Storage (run_log.json)"]
+        Main -->|"Structured Logs"| CloudLogging["GCP Cloud Logging"]
+        Main -->|"Read / Update Memory"| GCSMem["Cloud Storage (agent_memory.json)"]
     end
 
-    subgraph Operational Pipeline (Per-Batch)
-        Main -->|Auth & Ingest Unread| GmailClient[Gmail Client]
-        Main -->|Analyze & Triage| Summarizer[AI Summarizer]
-        Persona -->|Context & Focus Areas| Summarizer
-        GCSMem -->|Learned Hints & Guidelines| Summarizer
-        GmailClient -.->|Email Content & RFC 2369| Summarizer
-        Summarizer -->|Cognitive Triage & Briefing| GeminiAPI[Gemini 3.8 Flash]
-        GmailClient -->|Deliver In-Thread Forward| GmailAPI[Gmail API]
-        GmailClient -->|Apply Smart Labels| GmailAPI
+    subgraph OperationalPipeline ["Operational Pipeline (Per-Batch)"]
+        Main -->|"Auth & Ingest Unread"| GmailClient["Gmail Client"]
+        Main -->|"Analyze & Triage"| Summarizer["AI Summarizer"]
+        Persona -->|"Context & Focus Areas"| Summarizer
+        GCSMem -->|"Learned Hints & Guidelines"| Summarizer
+        GmailClient -.->|"Email Content & RFC 2369"| Summarizer
+        Summarizer -->|"Cognitive Triage & Briefing"| GeminiAPI["Gemini 3.8 Flash"]
+        GmailClient -->|"Deliver In-Thread Forward"| GmailAPI["Gmail API"]
+        GmailClient -->|"Apply Smart Labels"| GmailAPI
     end
 
-    subgraph Continuous Reflection & Memory Loop
-        GmailAPI -->|Harvest Stars & Label Changes| FeedbackEngine[Feedback Harvester]
-        FeedbackEngine -->|Interaction History| MetaReflect[Gemini Meta-Reflection]
-        MetaReflect -->|Synthesize Optimized Guidelines| GCSMem
+    subgraph ReflectionLoop ["Continuous Reflection & Memory Loop"]
+        GmailAPI -->|"Harvest Stars & Label Changes"| FeedbackEngine["Feedback Harvester"]
+        FeedbackEngine -->|"Interaction History"| MetaReflect["Gemini Meta-Reflection"]
+        MetaReflect -->|"Synthesize Optimized Guidelines"| GCSMem
     end
 
-    GmailAPI -->|Delivers Forwarded Briefing| User((User))
+    GmailAPI -->|"Delivers Forwarded Briefing"| User(("User Inbox"))
 ```
 
 ### Multi-PC Cloud Architecture Strategy
