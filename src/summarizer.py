@@ -1,25 +1,29 @@
 """
-AI Email Summarization & Analysis Engine (`src.summarizer`)
-==========================================================
+AI Email Summarization & Cognitive Triage Engine (`src.summarizer`)
+==================================================================
 
 Purpose:
-    Utilizes Google Gemini 3.8 Flash to analyze email content, generate structured
-    concise summaries, extract key insights, detect required user actions, and provide
-    educational Chinese language breakdowns for FTChinese newsletters.
+    Utilizes Google Gemini (Gemini 3.8 Flash) to analyze emails as an autonomous
+    executive assistant for Henry Hyunwoo Kim (AI & Cloud Solutions Architect).
 
-Key Features:
-    1. Multilingual Unsubscribe Link Extraction:
-       Combines HTML DOM anchor inspection via BeautifulSoup with resilient regex patterns
-       supporting English, Chinese, Japanese, Korean, Spanish, French, German, and Russian.
-    2. Purchase / Transactional Email Filtering:
-       Applies heuristic scoring across subject lines, body snippets, and known commerce
-       sender domains (Amazon, PayPal, Shopify, etc.) to skip noise.
-    3. Structured JSON Enforcement:
-       Forces strict JSON schemas with multi-tiered JSON extraction fallbacks
-       (code fence extraction -> JSON object regex matching).
-    4. Resilient Exponential Backoff:
-       Implements retry loops with backoff specifically handling transient HTTP 429
-       rate limits and Vertex AI / Gemini API resource exhaustion.
+Agentic Capabilities:
+    1. Unified Semantic Triage:
+       Intelligently categorizes emails into actionable communications, deep-dive
+       articles/newsletters, transactional receipts, service notifications, or noise,
+       eliminating rigid, fragile keyword matching.
+    2. Context-Aware Persona Alignment:
+       Injects the user's technical profile, expertise (Agentic AI, Cloud/Serverless,
+       Digital ODA, AI Ethics), and priority focus areas into every briefing.
+    3. Autonomous Chinese Language Detection & Study:
+       Dynamically identifies Chinese language content across email text and fetched
+       articles, automatically generating structured language learning breakdowns
+       (original, pinyin with tone marks, vocabulary, English translation) without
+       hardcoded sender domains.
+    4. RFC-Compliant Unsubscribe & Link Intelligence:
+       Prioritizes RFC 2369 List-Unsubscribe headers over heuristics, with full DOM
+       and regex fallback.
+    5. External Content Ingestion:
+       Discovers and ingests referenced articles, YouTube transcripts, and media notes.
 """
 from __future__ import annotations
 
@@ -38,12 +42,20 @@ from src.config import (
     get_max_body_chars,
     get_max_external_links,
 )
+from src.agent_memory import AgentMemoryManager
 from src.content_fetcher import ContentFetcher
+from src.persona import (
+    build_persona_prompt_context,
+    detect_chinese_content,
+    detect_language_content,
+    get_user_target_language,
+    load_user_persona,
+)
 
 
 class EmailSummarizer:
     """
-    Intelligent email analyzer powered by Google Gemini AI.
+    Cognitive email analyzer and triage engine powered by Google Gemini AI.
     """
 
     # ==========================================================================
@@ -52,7 +64,7 @@ class EmailSummarizer:
 
     def __init__(self, api_key: str, model_name: str | None = None) -> None:
         """
-        Initializes the Gemini GenerativeModel client and ContentFetcher.
+        Initializes the Gemini GenerativeModel client, ContentFetcher, and AgentMemoryManager.
 
         Args:
             api_key: Valid Google Gemini AI API key.
@@ -63,26 +75,35 @@ class EmailSummarizer:
         selected_model = model_name or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         self.model = genai.GenerativeModel(selected_model)
         self.content_fetcher = ContentFetcher()
+        self.memory_manager = AgentMemoryManager()
 
     # ==========================================================================
-    # SECTION 2: Multilingual Unsubscribe Link Extraction
+    # SECTION 2: Unsubscribe Link Extraction (RFC 2369 + DOM + Regex)
     # ==========================================================================
 
-    def extract_unsubscribe_link(self, email_body: str) -> str | None:
+    def extract_unsubscribe_link(
+        self,
+        email_body: str,
+        list_unsubscribe: str | None = None,
+    ) -> str | None:
         """
-        Extracts an unsubscribe or preference management link from an email body.
+        Extracts an unsubscribe or preference link from RFC headers or email body.
 
-        Extraction Strategy:
-            1. HTML DOM parsing: Scans <a> tags for multilingual keywords in text or href.
-            2. Regex fallback: Matches URLs containing unsubscribe keywords in plain text.
+        Resolution Cascade:
+            1. RFC 2369 List-Unsubscribe header (standard HTTP URL).
+            2. HTML DOM parsing: Scans <a> tags for multilingual keywords in text or href.
+            3. Regex fallback: Matches URLs containing unsubscribe slugs in plain text.
 
         Args:
             email_body: Raw email body string (plain text or HTML).
+            list_unsubscribe: Optional URL from RFC 2369 header.
 
         Returns:
-            The extracted HTTP(S) link string, or None if no link was detected.
+            Extracted HTTP(S) unsubscribe URL string, or None if not found.
         """
-        # Multilingual unsubscribe keywords (lowercased for case-insensitive matching)
+        if list_unsubscribe and list_unsubscribe.startswith(("http://", "https://")):
+            return list_unsubscribe
+
         keywords: list[str] = [
             "unsubscribe", "optout", "opt-out", "remove", "preferences",
             "退订", "取消订阅",                     # Chinese
@@ -98,19 +119,17 @@ class EmailSummarizer:
 
         link: str | None = None
 
-        # Step 1: Parse as HTML via BeautifulSoup if HTML tags are present
+        # Step 1: Parse HTML DOM anchors if HTML is present
         if "<html" in email_body.lower() or "<body" in email_body.lower() or "<a " in email_body.lower():
             soup = BeautifulSoup(email_body, "html.parser")
             for a_tag in soup.find_all("a", href=True):
                 text = a_tag.get_text().strip().lower()
                 href = a_tag["href"].lower()
 
-                # Check if anchor display text matches any keyword
                 if any(kw in text for kw in keywords):
                     link = a_tag["href"]
                     break
 
-                # Check if URL itself contains common English unsubscribe slugs
                 english_kws = ["unsubscribe", "optout", "opt-out", "remove"]
                 if any(kw in href for kw in english_kws):
                     link = a_tag["href"]
@@ -132,29 +151,26 @@ class EmailSummarizer:
             match = re.search(pattern, email_body, re.IGNORECASE)
             if match:
                 extracted = match.group(0)
-                # Strip trailing punctuation or HTML delimiters
                 extracted = re.sub(r"[,;.)\]]+$", "", extracted)
                 return extracted
 
         return None
 
     # ==========================================================================
-    # SECTION 3: Transactional & Purchase Email Heuristics
+    # SECTION 3: Semantic Triage & Heuristic Fallbacks
     # ==========================================================================
 
     def is_purchase_email(self, email_content: dict[str, Any]) -> bool:
         """
-        Determines whether an email is an automated receipt, order confirmation, or invoice.
+        Lightweight heuristic fallback to identify transactional e-commerce receipts.
 
-        Heuristic Scoring:
-            - Scans subject, first 500 characters of body, and sender address.
-            - Filters if 2+ purchase keywords match OR 1+ keyword from a recognized e-commerce domain.
+        Primary classification is handled dynamically via `summarize()`.
 
         Args:
-            email_content: Dictionary containing 'subject', 'sender', and 'body' fields.
+            email_content: Dictionary containing 'subject', 'sender', and 'body'.
 
         Returns:
-            True if the email matches transactional purchase characteristics.
+            True if the email exhibits clear e-commerce receipt patterns.
         """
         subject_lower = email_content.get("subject", "").lower()
         body_lower = email_content.get("body", "")[:500].lower()
@@ -166,55 +182,57 @@ class EmailSummarizer:
             "thank you for your order", "order number", "tracking number",
             "order confirmation", "purchase confirmation", "order placed",
             "order received", "order summary", "billing", "charge",
+            "주문", "결제", "영수증", "배송", "주문번호",       # Korean
+            "注文", "請求書", "お支払い", "領収書", "配送",      # Japanese
+            "订单", "发票", "交易", "发货", "购买",             # Chinese
         ]
 
-        # Recognized commercial transaction domains and service addresses
         purchase_domains = [
             "amazon", "rakuten", "ebay", "paypal", "stripe", "shopify",
-            "shop.", "store.", "orders@", "noreply@", "no-reply@",
+            "coupang", "naver.com", "shop.", "store.", "orders@", "noreply@", "no-reply@",
         ]
 
         is_commerce_sender = any(domain in sender_lower for domain in purchase_domains)
-
-        # Count occurrences of purchase terms across subject and body
         keyword_count = sum(1 for kw in purchase_keywords if kw in subject_lower or kw in body_lower)
 
-        # Classification threshold
         return keyword_count >= 2 or (is_commerce_sender and keyword_count >= 1)
 
     # ==========================================================================
-    # SECTION 4: AI Summarization & Chinese Study Generation
+    # SECTION 4: AI Summarization, Triage & Chinese Study Generation
     # ==========================================================================
 
     def summarize(
         self,
         email_content: dict[str, Any],
-        include_translation: bool = False,
+        include_translation: bool | None = None,
     ) -> dict[str, Any]:
         """
-        Generates an executive-grade, insightful newsletter briefing with deep context.
+        Performs end-to-end cognitive triage and executive briefing generation.
 
-        Capabilities:
-            - External Link Ingestion: Discovers and fetches candidate full articles,
-              YouTube transcripts, and podcast show notes referenced in the email.
-            - Expanded Context Limits: Processes up to 40,000 characters of email body.
-            - Deep-Dive Intelligence: Generates an executive overview, detailed key insights,
-              external source highlights, and actionable takeaways.
-            - FTChinese Dual Mode: Provides both the comprehensive article briefing
-              AND the educational sentence-by-sentence Chinese study breakdown.
+        Features:
+            - Semantic Triage: Classifies email intent and determines optimal action
+              (forward_briefing, skip_receipt, skip_noise).
+            - Persona Context: Tailors insights to Henry Hyunwoo Kim's technical focus
+              (Agentic AI, Cloud/Serverless, Digital ODA, AI Ethics).
+            - Autonomous Chinese Detection: Automatically creates Chinese study segments
+              whenever Chinese content is detected, without hardcoded sender rules.
+            - External Source Ingestion: Enriches preview emails with external articles
+              or YouTube transcripts when relevant.
 
         Args:
-            email_content: Dictionary containing 'subject', 'sender', 'body', and optional 'html_body'.
-            include_translation: Whether to generate educational FTChinese breakdown.
+            email_content: Dictionary containing 'subject', 'sender', 'body', 'html_body',
+                and optional 'list_unsubscribe'.
+            include_translation: Optional explicit override for Chinese study breakdown.
+                If None, dynamically detected from content.
 
         Returns:
-            Dictionary containing structured summary, key insights, external sources,
-            action_required flag, and metadata.
+            Dictionary containing structured summary, triage decisions, key insights,
+            Chinese study segments, and external source metadata.
         """
-        # Resolve unsubscribe link from HTML or plain body
         html_body = email_content.get("html_body", "")
         plain_body = email_content.get("body", "")
-        unsubscribe_link = self.extract_unsubscribe_link(html_body or plain_body)
+        list_unsub = email_content.get("list_unsubscribe")
+        unsubscribe_link = self.extract_unsubscribe_link(html_body or plain_body, list_unsub)
 
         # Step 1: External content discovery & ingestion
         external_context = ""
@@ -239,13 +257,52 @@ class EmailSummarizer:
                         "End external source.\n"
                     )
 
-        # Step 2: Body length resolution
+        # Step 2: Body truncation
         max_chars = get_max_body_chars()
         truncated_body = plain_body[:max_chars]
 
-        # Step 3: Construct AI Prompt
-        if include_translation:
-            prompt = f"""Analyze this FTChinese email and any fetched article content. Write a concise but substantive briefing that preserves useful context, evidence, nuance, and implications, plus the requested Chinese study material.
+        # Step 3: Adaptive Language Learning & Target Language Detection
+        persona = load_user_persona()
+        recipient_name = persona.get("name", "User")
+        recipient_headline = persona.get("headline", "AI & Cloud Solutions Architect")
+        target_lang = get_user_target_language(persona)
+
+        detected_lang = False
+        if target_lang:
+            detected_lang = detect_language_content(
+                truncated_body, target_lang, subject=email_content.get("subject", "")
+            )
+            if not detected_lang and fetched_sources:
+                detected_lang = any(
+                    detect_language_content(s.get("content", ""), target_lang) for s in fetched_sources
+                )
+
+        study_active = include_translation if include_translation is not None else detected_lang
+
+        # Step 4: Construct Persona-Aware Cognitive Prompt with Accumulated Guidelines
+        persona_context = build_persona_prompt_context(persona)
+        learned_guidelines = self.memory_manager.get_formatted_hints(limit=8)
+
+        lang_task_desc = (
+            f", and generate a {target_lang} language study breakdown if {target_lang} content is present"
+            if target_lang
+            else ""
+        )
+
+        if target_lang:
+            lang_study_rule = f"""3. Adaptive Language Study ({target_lang}):
+   - If the email or external source contains text in {target_lang} (or covers {target_lang} learning), set "has_language_study": true. Provide 1 to 5 distinct sentences of actual {target_lang} text from the source in "learning_segments", with pronunciation/phonetics (e.g. Pinyin, Furigana/Romaji, or stress guide), key vocabulary, and accurate English translation.
+   - If no {target_lang} text is present, set "has_language_study": false and "learning_segments": []."""
+        else:
+            lang_study_rule = """3. Language Study:
+   - No target learning language is configured by the user. Set "has_language_study": false and "learning_segments": []."""
+
+        prompt = f"""{persona_context}
+
+{learned_guidelines}
+TASK:
+You are {recipient_name}'s executive AI email agent. Analyze this incoming email and any fetched external content.
+Make an intelligent triage decision, produce a high-signal briefing calibrated to {recipient_name}'s expertise ({recipient_headline}){lang_task_desc}.
 
 Email Subject: {email_content.get('subject', '')}
 Email Sender: {email_content.get('sender', '')}
@@ -253,81 +310,51 @@ Email Content:
 {truncated_body}
 {external_context}
 
-IMPORTANT: You must respond with ONLY valid JSON in this exact structure (no markdown fences, no explanatory preamble):
+RESPONSE FORMAT:
+You must respond with ONLY valid JSON in this exact structure (no markdown fences, no explanatory preamble):
 {{
-    "executive_summary": "A substantive 3-5 sentence synthesis of the narrative, relevant background, and stakes; reserve figures, examples, and detailed evidence for the insights.",
+    "category": "newsletter_article | actionable_communication | transactional_receipt | service_notification | promotional_noise",
+    "triage_action": "forward_briefing | skip_receipt | skip_noise",
+    "executive_summary": "A substantive 3-5 sentence synthesis of the core narrative, relevant context, architectural/strategic stakes, and key developments.",
     "key_insights": [
         {{
-            "topic": "Short topic",
-            "details": "An evidence-based analysis of a distinct mechanism, tension, consequence, or implication, with enough context to explain why it matters."
+            "topic": "Short topic name",
+            "details": "Evidence-based technical analysis of mechanisms, trade-offs, systems implications, or strategic significance. Tailored for {recipient_headline}."
         }}
     ],
+    "external_source_highlights": "Substantive evidence, data points, or arguments found in the fetched external sources that were missing from the email preview; return null if no external source was ingested.",
     "actionable_takeaways": [
-        "Optional practical recommendation or implication grounded in the source"
+        "Practical recommendation, follow-up consideration, or implication grounded in the text"
     ],
     "action_required": false,
-    "reason": "Brief explanation of why action is or isn't required",
+    "reason": "Brief one-sentence explanation of why action is or is not required from {recipient_name}",
+    "target_language": "{target_lang or ''}",
+    "has_language_study": {str(study_active).lower()},
     "learning_segments": [
         {{
-            "original": "...",
-            "pinyin": "...",
+            "original": "{target_lang or 'Target language'} sentence from the email/article",
+            "pronunciation": "Pronunciation/phonetics (e.g. Pinyin with tone marks, Furigana/Romaji, or stress guide)",
             "vocabulary": [
-                {{"word": "...", "pinyin": "...", "english": "..."}}
+                {{"word": "vocabulary term", "pronunciation": "pronunciation", "english": "vocabulary word meaning"}}
             ],
-            "translation": "..."
+            "translation": "Precise, natural English translation"
         }}
     ]
 }}
 
-Rules:
-- Keep distinct roles: the summary explains the narrative, context, and stakes; insights interpret concrete evidence and implications; takeaways state practical next steps.
-- Reserve specific figures and examples for insights instead of repeating them in the summary. Each insight should add a different evidence-backed angle.
-- Preserve decision-relevant context, figures, examples, caveats, and causal links. Reduce repetition, not analysis; do not pad to a target length.
-- key_insights: Usually provide 2-4 substantive insights for a complex newsletter and fewer for a simple email. Give each 1-3 sentences with evidence and why it matters.
-- actionable_takeaways: Return 0-3 useful recommendations that are distinct from the insights; use an empty array when none adds value.
-- action_required: true if the email requires a reply, approval, or task from the recipient, false otherwise.
-- reason: Brief one-sentence explanation.
-- learning_segments: Cover up to the first 5 distinct sentences of main article text (exclude ads, promotions, and footer links). Include original Chinese, pinyin with tone marks, up to 3 vocabulary words, and English translation.
-- Use only source-supported facts; do not infer details or inflate significance.
-- Output ONLY the JSON object, nothing else.
-"""
-        else:
-            prompt = f"""Analyze this email and any fetched external content. Produce a concise but substantive briefing: preserve meaningful context, evidence, nuance, and implications while removing repetition.
-
-Email Subject: {email_content.get('subject', '')}
-Email Sender: {email_content.get('sender', '')}
-Email Content:
-{truncated_body}
-{external_context}
-
-IMPORTANT: You must respond with ONLY valid JSON in this exact structure (no markdown fences, no explanatory preamble):
-{{
-    "executive_summary": "A substantive 3-5 sentence synthesis of the narrative, relevant background, and stakes; reserve figures, examples, and detailed evidence for the insights.",
-    "key_insights": [
-        {{
-            "topic": "Short topic",
-            "details": "An evidence-based analysis of a distinct mechanism, tension, consequence, or implication, with enough context to explain why it matters."
-        }}
-    ],
-    "external_source_highlights": "A substantive synthesis of useful evidence, examples, arguments, or caveats found in fetched sources but missing from the email preview; otherwise null.",
-    "actionable_takeaways": [
-        "Optional practical recommendation or implication grounded in the source"
-    ],
-    "action_required": false,
-    "reason": "Brief explanation of why action is or isn't required"
-}}
-
-Rules:
-- Keep distinct roles: the summary explains the narrative, context, and stakes; insights interpret concrete evidence and implications; source highlights add material available only in fetched content; takeaways state practical next steps.
-- Reserve specific figures and examples for insights instead of repeating them in the summary. Each insight should add a different evidence-backed angle.
-- Preserve decision-relevant context, figures, examples, caveats, and causal links. Reduce repetition, not analysis; do not pad to a target length.
-- key_insights: Usually provide 2-4 substantive insights for a complex newsletter and fewer for a simple email. Give each 1-3 sentences with evidence and why it matters.
-- external_source_highlights: Explain what the fetched source adds beyond the email. Do not claim to have read a source unless its content was fetched successfully; otherwise return null.
-- actionable_takeaways: Return 0-3 useful recommendations that are distinct from the insights; use an empty array when none adds value.
-- action_required: true if the email requires a response, decision, or action from the recipient, false otherwise.
-- reason: Brief one-sentence explanation.
-- Use only source-supported facts; do not infer details or inflate significance.
-- Output ONLY the JSON object, nothing else.
+TRIAGE & REASONING RULES:
+1. Category & Triage Action:
+   - "transactional_receipt" / "skip_receipt": Automated e-commerce purchase receipts, shipping notifications, order confirmations, payment transaction notices with no pending action needed.
+   - "promotional_noise" / "skip_noise": Cold marketing pitches, unrequested promotional newsletters, low-value spam.
+   - "newsletter_article" / "forward_briefing": Substantive technology newsletters, analytical articles, industry briefings, research insights.
+   - "actionable_communication" / "forward_briefing": Direct personal/business correspondence, project requests, approvals, or messages requiring review or reply.
+   - "service_notification": Automated cloud/platform alerts; set "forward_briefing" only if urgent/actionable, else "skip_noise".
+2. Persona Calibration:
+   - Highlight technical architecture, agentic workflows, serverless implications, digital transformation, and systemic trade-offs. Avoid shallow platitudes or repeating marketing taglines.
+{lang_study_rule}
+4. Action Required:
+   - true ONLY if {recipient_name} needs to reply, make an approval, or take concrete action. Newsletters or informative reads are false.
+5. Output ONLY the JSON object, with no prefix or suffix.
 """
 
         max_retries: int = 5
@@ -338,18 +365,17 @@ Rules:
                 response = self.model.generate_content(prompt)
                 text = response.text.strip()
 
-                # Step 1: Attempt JSON block extraction
+                # Step 1: JSON block extraction
                 extracted_json = text
                 if "```json" in text:
                     extracted_json = text.split("```json")[1].split("```")[0].strip()
                 elif "```" in text:
                     extracted_json = text.split("```")[1].split("```")[0].strip()
 
-                # Step 2: Attempt standard JSON parsing
+                # Step 2: Parse standard JSON
                 try:
                     result = json.loads(extracted_json)
                 except json.JSONDecodeError:
-                    # Step 3: Regex fallback for JSON object boundaries
                     json_match = re.search(r"(\{[\s\S]*\})", text)
                     if json_match:
                         try:
@@ -357,14 +383,14 @@ Rules:
                         except json.JSONDecodeError:
                             if attempt == max_retries - 1:
                                 raise ValueError(f"Could not parse JSON from Gemini response: {text[:100]}...")
-                            print(f"JSON parsing failed on attempt {attempt + 1}. Retrying...")
+                            print(f"[SUMMARIZER] JSON parsing failed on attempt {attempt + 1}. Retrying...")
                             continue
                     else:
                         if attempt == max_retries - 1:
                             raise ValueError(f"No JSON object detected in response: {text[:100]}...")
                         continue
 
-                # Normalize keys for backwards and forwards compatibility
+                # Backward and forward compatibility key normalization
                 if "executive_summary" in result and "summary" not in result:
                     result["summary"] = result["executive_summary"]
                 elif "summary" in result and "executive_summary" not in result:
@@ -381,24 +407,81 @@ Rules:
                         for item in result.get("sections", [])
                     ]
 
+                # Default fallback for category & triage_action
+                if "category" not in result:
+                    result["category"] = "newsletter_article"
+                if "triage_action" not in result:
+                    result["triage_action"] = "forward_briefing"
+
+                # Adaptive language study normalization
+                if "has_language_study" not in result:
+                    result["has_language_study"] = bool(result.get("has_chinese") or result.get("learning_segments"))
+                result["has_chinese"] = bool(
+                    result.get("has_language_study")
+                    and (not target_lang or "chinese" in target_lang.lower() or "mandarin" in target_lang.lower())
+                )
+                result["target_language"] = target_lang
+
+                # Normalize learning_segments fields
+                normalized_segments = []
+                for seg in result.get("learning_segments", []):
+                    pron = seg.get("pronunciation") or seg.get("pinyin") or seg.get("phonetics") or ""
+                    vocab = seg.get("vocabulary") or []
+                    norm_vocab = []
+                    for v in vocab:
+                        w = v.get("word") or v.get("term") or ""
+                        p = v.get("pronunciation") or v.get("pinyin") or ""
+                        e = v.get("meaning") or v.get("english") or ""
+                        norm_vocab.append({
+                            "word": w,
+                            "term": w,
+                            "pinyin": p,
+                            "pronunciation": p,
+                            "english": e,
+                            "meaning": e,
+                        })
+                    normalized_segments.append({
+                        "original": seg.get("original", ""),
+                        "pronunciation": pron,
+                        "pinyin": pron,
+                        "translation": seg.get("translation", ""),
+                        "vocabulary": norm_vocab,
+                    })
+                result["learning_segments"] = normalized_segments
+
                 result["unsubscribe_link"] = unsubscribe_link
                 result["external_sources"] = fetched_sources
+
+                # Record interaction for meta-reflection and self-improvement
+                try:
+                    self.memory_manager.record_interaction(
+                        msg_id=email_content.get("id", ""),
+                        sender=email_content.get("sender", ""),
+                        subject=email_content.get("subject", ""),
+                        category=result.get("category", "newsletter_article"),
+                        triage_action=result.get("triage_action", "forward_briefing"),
+                        action_required=result.get("action_required", False),
+                    )
+                except Exception:
+                    pass
+
                 return result
 
             except Exception as e:
                 error_msg = str(e)
-                print(f"Attempt {attempt + 1} failed: {error_msg}")
+                print(f"[SUMMARIZER] Attempt {attempt + 1} failed: {error_msg}")
                 if attempt < max_retries - 1:
-                    # Handle Vertex AI / Gemini 429 Rate Limit
                     if "429" in error_msg or "Resource exhausted" in error_msg:
-                        print("Rate limit reached. Waiting 60 seconds before retrying...")
+                        print("[SUMMARIZER] Rate limit reached. Waiting 60 seconds before retrying...")
                         time.sleep(60)
                     else:
                         time.sleep(retry_delay * (attempt + 1))
                 else:
                     traceback.print_exc()
-                    print(f"Error summarizing email after {max_retries} attempts: {e}")
+                    print(f"[SUMMARIZER] Error summarizing email after {max_retries} attempts: {e}")
                     return {
+                        "category": "service_notification",
+                        "triage_action": "forward_briefing",
                         "executive_summary": "Error summarizing email.",
                         "summary": "Error summarizing email.",
                         "key_insights": [],
@@ -407,9 +490,15 @@ Rules:
                         "reason": f"AI processing failed: {str(e)}",
                         "unsubscribe_link": unsubscribe_link,
                         "external_sources": fetched_sources,
+                        "target_language": target_lang,
+                        "has_language_study": False,
+                        "has_chinese": False,
+                        "learning_segments": [],
                     }
 
         return {
+            "category": "service_notification",
+            "triage_action": "forward_briefing",
             "executive_summary": "Error summarizing email.",
             "summary": "Error summarizing email.",
             "key_insights": [],
@@ -418,4 +507,8 @@ Rules:
             "reason": "AI processing failed: Maximum retries exceeded.",
             "unsubscribe_link": unsubscribe_link,
             "external_sources": fetched_sources,
+            "target_language": target_lang,
+            "has_language_study": False,
+            "has_chinese": False,
+            "learning_segments": [],
         }

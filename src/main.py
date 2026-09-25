@@ -89,9 +89,12 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
     stats: dict[str, Any] = {
         "total": 0,
         "self_sent": 0,
-        "purchase": 0,
+        "receipts_categorized": 0,
+        "noise_filtered": 0,
         "already_summarized": 0,
         "processed": 0,
+        "language_study_generated": 0,
+        "chinese_study_generated": 0,
         "external_sources_fetched": 0,
         "dry_run": dry_run,
     }
@@ -133,7 +136,7 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
             profile = client.service.users().getProfile(userId="me").execute()
             user_email = profile.get("emailAddress", "")
 
-            # Stage 4: Iterate and Filter Messages
+            # Stage 4: Iterate and Intelligently Triage Messages
             for msg in messages:
                 msg_id = msg["id"]
                 print(f"\nProcessing message ID: {msg_id}")
@@ -142,41 +145,67 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                 if not content:
                     continue
 
-                # Filter 4a: Thread redundancy check
+                # Filter 4a: Thread redundancy check (respects incoming third-party replies)
                 thread_id = msg.get("threadId")
                 if thread_id and client.thread_has_summary(thread_id, user_email):
                     stats["already_summarized"] += 1
-                    client.mark_as_read(msg_id)
-                    print("Skipping - thread already contains a forwarded summary. Marked as read.")
+                    if not dry_run:
+                        client.mark_as_read(msg_id)
+                    print("Skipping - thread's latest message is already a forwarded summary.")
                     continue
 
-                # Filter 4b: Self-sent check
+                # Filter 4b: Self-sent echo loop check
                 sender_email = content.get("sender", "")
                 if "<" in sender_email:
                     sender_email = sender_email.split("<")[1].split(">")[0]
                 sender_email = sender_email.strip("<> ")
 
-                if user_email.lower() in sender_email.lower():
+                is_agent_echo = (
+                    "fwd:" in content.get("subject", "").lower()
+                    or "gmail agent log" in content.get("subject", "").lower()
+                )
+                if user_email.lower() in sender_email.lower() and is_agent_echo:
                     stats["self_sent"] += 1
-                    client.mark_as_read(msg_id)
-                    print(f"Skipping email from self: {sender_email}")
-                    continue
-
-                # Filter 4c: Purchase & transactional receipt check
-                if summarizer.is_purchase_email(content):
-                    stats["purchase"] += 1
-                    print(f"Skipping purchase email: {content.get('subject')}")
+                    if not dry_run:
+                        client.mark_as_read(msg_id)
+                    print(f"Skipping automated echo loop from self: {content.get('subject')}")
                     continue
 
                 print(f"Subject: {content.get('subject')}")
                 print(f"From: {content.get('sender')}")
 
-                # Stage 5: AI Summarization & Chinese Study Generation
-                is_ftchinese = sender_email.lower().endswith("newsletter.ftchinese.com")
-                analysis = summarizer.summarize(content, include_translation=is_ftchinese)
+                # Stage 5: Cognitive AI Analysis, Triage, and Chinese Study
+                analysis = summarizer.summarize(content)
 
+                triage_action = analysis.get("triage_action", "forward_briefing")
+                category = analysis.get("category", "newsletter_article")
+
+                # Filter 4c: Intelligent Transactional Receipt Handling
+                if triage_action == "skip_receipt" or category == "transactional_receipt":
+                    stats["receipts_categorized"] += 1
+                    print(f"Intelligently categorized as transactional receipt: {content.get('subject')}")
+                    if not dry_run:
+                        client.add_label(msg_id, "Receipts")
+                        client.mark_as_read(msg_id)
+                    continue
+
+                # Filter 4d: Intelligent Promotional Noise Filtering
+                if triage_action == "skip_noise" or category == "promotional_noise":
+                    stats["noise_filtered"] += 1
+                    print(f"Intelligently filtered low-value promotional noise: {content.get('subject')}")
+                    if not dry_run:
+                        client.mark_as_read(msg_id)
+                    continue
+
+                # Stage 5 (cont): Process Forwardable Intelligence
                 ext_sources = analysis.get("external_sources", [])
                 stats["external_sources_fetched"] += len(ext_sources)
+
+                if analysis.get("has_language_study") or analysis.get("has_chinese") or analysis.get("learning_segments"):
+                    stats["language_study_generated"] += 1
+                    stats["chinese_study_generated"] += 1
+                    target_lang_label = analysis.get("target_language") or "Language"
+                    print(f"[{target_lang_label.upper()} STUDY] Generated study breakdown ({len(analysis.get('learning_segments', []))} sentences).")
 
                 exec_summary = analysis.get("executive_summary") or analysis.get("summary", "No summary provided.")
                 print(f"Executive Summary: {exec_summary[:120]}...")
@@ -184,8 +213,8 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                 if ext_sources:
                     print(f"External Sources Ingested: {len(ext_sources)}")
 
-                # Stage 6: Compose a concise briefing before the forwarded email.
-                summary_text = compose_briefing(content, analysis, include_translation=is_ftchinese)
+                # Stage 6: Compose concise briefing with persona-aligned insights & language study
+                summary_text = compose_briefing(content, analysis)
 
                 # Stage 6 (cont): Dispatch Forward or Simulate Dry-Run
                 if dry_run:
@@ -210,14 +239,28 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
         print("SUMMARY STATISTICS")
         print("=" * 50)
         print(f"Total unread emails: {stats['total']}")
-        print(f"Filtered (self-sent): {stats['self_sent']}")
-        print(f"Filtered (purchase): {stats['purchase']}")
-        print(f"Filtered (already summarized): {stats['already_summarized']}")
         print(f"Processed & forwarded: {stats['processed']}")
+        print(f"Categorized as receipts: {stats['receipts_categorized']}")
+        print(f"Filtered (promotional noise): {stats['noise_filtered']}")
+        print(f"Filtered (echo / self-sent): {stats['self_sent']}")
+        print(f"Filtered (already summarized): {stats['already_summarized']}")
+        print(f"Language study briefings: {stats['language_study_generated']}")
         print(f"External sources ingested: {stats['external_sources_fetched']}")
         if dry_run:
             print("Mode: DRY-RUN (no modifications made)")
         print("=" * 50)
+
+        # Stage 8: Autonomous Feedback Harvesting & Self-Improvement Reflection
+        if not dry_run and "client" in locals() and "summarizer" in locals():
+            try:
+                harvested = summarizer.memory_manager.harvest_signals(client.service)
+                if harvested > 0:
+                    print(f"[MEMORY] Harvested {harvested} user feedback signal(s) from Gmail.")
+                reflected = summarizer.memory_manager.reflect_and_optimize(api_key)
+                if reflected:
+                    print("[MEMORY] Meta-reflection updated operational prompt guidelines for future runs.")
+            except Exception as mem_err:
+                print(f"[MEMORY] Note on self-improvement reflection: {mem_err}")
 
     except Exception as e:
         error_message = str(e)

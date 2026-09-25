@@ -85,34 +85,37 @@ class GmailClient:
 
     def thread_has_summary(self, thread_id: str, user_email: str) -> bool:
         """
-        Determines whether a message thread already contains a forwarded summary.
+        Determines whether a message thread's latest activity is already a forwarded summary.
 
-        Prevents duplicate summaries when multiple unread replies arrive in a thread.
+        Prevents duplicate summaries when a message was already forwarded, while
+        ensuring that new incoming replies from external senders are NOT ignored.
 
         Args:
             thread_id: Gmail thread ID to inspect.
             user_email: Authenticated user email address.
 
         Returns:
-            True if any message in the thread is a forward sent by the user.
+            True if the latest message in the thread is a forward sent by the user.
         """
         try:
             thread = self.service.users().threads().get(userId="me", id=thread_id).execute()
             messages = thread.get("messages", [])
 
-            for msg in messages:
-                # Ignore deleted messages residing in TRASH
-                label_ids = msg.get("labelIds", [])
-                if "TRASH" in label_ids:
-                    continue
+            valid_messages = [
+                m for m in messages if "TRASH" not in m.get("labelIds", [])
+            ]
+            if not valid_messages:
+                return False
 
-                headers = msg.get("payload", {}).get("headers", [])
-                subject = next((h["value"] for h in headers if h["name"] == "Subject"), "")
-                sender = next((h["value"] for h in headers if h["name"] == "From"), "")
+            # Inspect the latest message in the thread
+            latest_msg = valid_messages[-1]
+            headers = latest_msg.get("payload", {}).get("headers", [])
+            subject = next((h["value"] for h in headers if h["name"] == "Subject"), "")
+            sender = next((h["value"] for h in headers if h["name"] == "From"), "")
 
-                # Detect if an earlier forward was sent by the agent
-                if "Fwd:" in subject and user_email.lower() in sender.lower():
-                    return True
+            # If the latest message in thread is our own forward, thread is already up to date
+            if "Fwd:" in subject and user_email.lower() in sender.lower():
+                return True
             return False
         except HttpError as error:
             print(f"[GMAIL] Error checking thread '{thread_id}': {error}")
@@ -165,17 +168,16 @@ class GmailClient:
 
     def get_message_content(self, msg_id: str) -> dict[str, Any] | None:
         """
-        Retrieves and decodes the subject, sender, body, and raw HTML of a message.
+        Retrieves and decodes the subject, sender, body, headers, and raw HTML of a message.
 
-        Handles recursive multipart MIME structures (e.g. multipart/mixed containing
-        multipart/alternative) and preserves hyperlinks during HTML-to-text conversion.
+        Handles recursive multipart MIME structures and RFC 2369 List-Unsubscribe headers.
 
         Args:
             msg_id: Gmail message ID.
 
         Returns:
-            Dictionary with 'id', 'subject', 'sender', 'body', and 'html_body' fields,
-            or None on error.
+            Dictionary with 'id', 'subject', 'sender', 'body', 'html_body',
+            and 'list_unsubscribe' fields, or None on error.
         """
         try:
             message = self.service.users().messages().get(userId="me", id=msg_id).execute()
@@ -184,6 +186,16 @@ class GmailClient:
 
             subject = next((h["value"] for h in headers if h["name"] == "Subject"), "No Subject")
             sender = next((h["value"] for h in headers if h["name"] == "From"), "Unknown Sender")
+
+            # Extract standard RFC 2369 List-Unsubscribe header
+            list_unsub_raw = next(
+                (h["value"] for h in headers if h["name"].lower() == "list-unsubscribe"), ""
+            )
+            list_unsubscribe_url = None
+            if list_unsub_raw:
+                http_matches = re.findall(r"<(https?://[^>]+)>", list_unsub_raw)
+                if http_matches:
+                    list_unsubscribe_url = http_matches[0]
 
             plain_parts: list[str] = []
             html_parts: list[str] = []
@@ -212,7 +224,6 @@ class GmailClient:
             # Choose the most substantive body representation
             if raw_html:
                 markdown_text = self._html_to_markdown_text(raw_html)
-                # If plain text is minimal or missing, or markdown text has more content/links
                 if len(plain_text) < 150 or len(markdown_text) > len(plain_text):
                     effective_body = markdown_text
                 else:
@@ -226,6 +237,7 @@ class GmailClient:
                 "sender": sender,
                 "body": effective_body,
                 "html_body": raw_html,
+                "list_unsubscribe": list_unsubscribe_url,
             }
         except HttpError as error:
             print(f"[GMAIL] Error retrieving content for message '{msg_id}': {error}")
@@ -436,10 +448,12 @@ Execution Time: {execution_time}
 📊 STATISTICS:
 --------------
 Total unread emails: {stats.get('total', 0)}
-Filtered (self-sent): {stats.get('self_sent', 0)}
-Filtered (purchase): {stats.get('purchase', 0)}
-Filtered (already summarized): {stats.get('already_summarized', 0)}
 Processed & forwarded: {stats.get('processed', 0)}
+Categorized (receipts): {stats.get('receipts_categorized', stats.get('purchase', 0))}
+Filtered (promotional noise): {stats.get('noise_filtered', 0)}
+Filtered (already summarized): {stats.get('already_summarized', 0)}
+Filtered (echo / self-sent): {stats.get('self_sent', 0)}
+Language study briefings: {stats.get('language_study_generated', stats.get('chinese_study_generated', 0))}
 External sources ingested: {stats.get('external_sources_fetched', 0)}
 {error_section}
 ========================

@@ -47,10 +47,38 @@ DEFAULT_MAX_EXTERNAL_LINKS: int = 2
 # Default maximum characters of email body passed to Gemini (expanded from 4,000 to 40,000)
 DEFAULT_MAX_BODY_CHARS: int = 40000
 
+# Default target learning language (None = disabled by default, adaptable per user)
+DEFAULT_TARGET_LEARNING_LANGUAGE: str | None = None
+
 
 # ==============================================================================
 # SECTION 2: Runtime Parameters & Environment Overrides
 # ==============================================================================
+
+def get_target_learning_language(override: str | None = None) -> str | None:
+    """
+    Returns the target language for adaptive educational language study breakdowns.
+
+    Resolution Priority:
+        1. Explicit function/CLI override.
+        2. `TARGET_LEARNING_LANGUAGE` environment variable (e.g. 'Mandarin Chinese',
+           'Spanish', 'Japanese', 'French', 'German', or 'none'/'disabled').
+        3. `DEFAULT_TARGET_LEARNING_LANGUAGE` (None / disabled by default).
+
+    Returns:
+        Target language string (e.g. 'Mandarin Chinese', 'Spanish') or None if disabled.
+    """
+    if override and str(override).strip():
+        val = str(override).strip()
+        return None if val.lower() in ("none", "false", "off", "disable", "disabled") else val
+
+    env_val = os.getenv("TARGET_LEARNING_LANGUAGE")
+    if env_val and env_val.strip():
+        val = env_val.strip()
+        return None if val.lower() in ("none", "false", "off", "disable", "disabled") else val
+
+    return DEFAULT_TARGET_LEARNING_LANGUAGE
+
 
 def get_max_emails(override: int | None = None) -> int:
     """

@@ -7,7 +7,7 @@ from typing import Any
 def compose_briefing(
     content: dict[str, Any],
     analysis: dict[str, Any],
-    include_translation: bool = False,
+    include_translation: bool | None = None,
 ) -> str:
     """Format analysis results as a concise plain-text email prefix."""
     lines: list[str] = []
@@ -44,19 +44,36 @@ def compose_briefing(
         lines.extend(f"- {takeaway.strip()}" for takeaway in takeaways if takeaway.strip())
 
     learning_segments = analysis.get("learning_segments") or []
-    if include_translation and learning_segments:
-        lines.extend(["", "📚 Chinese study"])
+    target_lang = analysis.get("target_language")
+    show_study = (
+        include_translation
+        if include_translation is not None
+        else bool(analysis.get("has_language_study") or analysis.get("has_chinese"))
+    )
+    if (show_study or learning_segments) and learning_segments:
+        header = f"📚 Language study ({target_lang})" if target_lang else "📚 Language study"
+        lines.extend(["", header])
         for index, segment in enumerate(learning_segments[:5], 1):
-            lines.append(f"{index}. {segment.get('original', '')}")
-            lines.append(f"   Pinyin: {segment.get('pinyin', '')}")
-            lines.append(f"   Translation: {segment.get('translation', '')}")
+            original = segment.get("original", "").strip()
+            pron = segment.get("pronunciation") or segment.get("pinyin") or segment.get("phonetics") or ""
+            translation = segment.get("translation", "").strip()
+            lines.append(f"{index}. {original}")
+            if pron:
+                lines.append(f"   Pronunciation: {pron.strip()}")
+            if translation:
+                lines.append(f"   Translation: {translation}")
             vocabulary = segment.get("vocabulary") or []
             if vocabulary:
-                words = "; ".join(
-                    f"{item.get('word', '')} ({item.get('pinyin', '')}) - {item.get('english', '')}"
-                    for item in vocabulary
-                )
-                lines.append(f"   Vocabulary: {words}")
+                vocab_parts = []
+                for item in vocabulary:
+                    term = item.get("word") or item.get("term") or ""
+                    p = item.get("pronunciation") or item.get("pinyin") or ""
+                    meaning = item.get("english") or item.get("meaning") or ""
+                    if p:
+                        vocab_parts.append(f"{term} ({p}) - {meaning}")
+                    else:
+                        vocab_parts.append(f"{term} - {meaning}")
+                lines.append(f"   Vocabulary: {'; '.join(vocab_parts)}")
 
     action_required = bool(analysis.get("action_required"))
     action_status = "Yes" if action_required else "No"

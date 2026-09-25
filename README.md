@@ -4,51 +4,61 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 
 ## Features
 
-- 📰 **Executive-Grade Intelligence Briefings**: Goes beyond superficial one-liners to provide comprehensive context, background significance, and practical takeaways.
+- 📰 **Executive-Grade Intelligence Briefings**: Delivers deep architectural, technical, and strategic context, background significance, and practical takeaways calibrated to an AI & Cloud Solutions Architect.
+- 🧠 **Context-Aware Persona Alignment**: Synchronizes with user profile memory (e.g. AI & Cloud Solutions Architect), prioritizing Agentic AI, Cloud & Serverless architectures, Digital ODA, and enterprise tech while deprioritizing noise.
 - 🌐 **External Content & Media Ingestion**: Automatically detects linked web articles, YouTube videos (extracting audio transcripts), and podcasts, analyzing full source content beyond initial email previews.
-- 💡 **Deep-Dive Key Insights**: Breaks down emails and linked sources into rich, analytical thematic sections with specific facts, data points, and strategic implications.
+- 💡 **Deep-Dive Key Insights**: Breaks down emails and linked sources into rich, analytical thematic sections with specific facts, data points, and systems-level implications.
 - ⚡ **Actionable Takeaways**: Clearly highlights key next steps, decisions, and recommendations.
-- 📚 **FTChinese Deep-Dive & Study Corner**: Comprehensive article briefing coupled with an educational sentence-by-sentence Chinese study section (Original, Pinyin, English, Key Vocabulary).
-- 🎯 **Action Detection & Auto-Labeling**: Automatically flags emails requiring action and applies Gmail labels (`ActionRequired` or `ReadLater`).
-- 🔗 **Smart Link Architecture**: Preserves hyperlinks and extracts unsubscribe/opt-out links for seamless one-click management.
-- ⚙️ **Configurable Limits & Schedule**: Easily adjust batch limits (`MAX_EMAILS`), external link ingestion (`ENABLE_EXTERNAL_FETCH`), body character limits (`MAX_BODY_CHARS`), and cron schedules.
+- 📚 **Adaptive Language Learning Corner**: Dynamically adapts to each user's language learning preference (e.g. Mandarin Chinese, Spanish, Japanese, French, German, or disabled). When content in the user's target language is detected across newsletters or articles, it automatically generates a sentence-by-sentence educational breakdown (Original text, Pronunciation/Phonetics, Vocabulary glossary, English translation).
+- 🎯 **Cognitive Triage & Auto-Labeling**: Intelligently categorizes emails into actionable communications (`ActionRequired`), valuable reading (`ReadLater`), routine transactional notices (`Receipts`), or filtered noise.
+- 🔗 **Smart Link Architecture**: Preserves hyperlinks and extracts RFC 2369 `List-Unsubscribe` headers and body opt-out links for seamless one-click management.
+- ⚙️ **Configurable Limits & Schedule**: Easily adjust batch limits (`DEFAULT_MAX_EMAILS = 20`), external link ingestion (`ENABLE_EXTERNAL_FETCH`), body character limits (`MAX_BODY_CHARS`), and cron schedules.
 - ☁️ **Cloud Native & Multi-PC Portable**: Runs seamlessly on local Windows/macOS/Linux or serverless on Google Cloud Run.
 
 
 ## Architecture
 
-The system is designed as a fully cloud-native, multi-PC portable application running on **Google Cloud Platform (GCP)**, leveraging **Google Cloud Secret Manager**, **Google Cloud Storage (GCS)**, and **Google Gemini 3.8 Flash** for high-speed, secure, and zero-setup execution across any machine or Cloud Run.
+The system is designed as a fully cloud-native, self-improving multi-PC application running on **Google Cloud Platform (GCP)**, leveraging **Google Cloud Secret Manager**, **Google Cloud Storage (GCS)**, and **Google Gemini 3.8 Flash** for high-speed, secure, cognitive execution across any workstation or Cloud Run.
 
 ![Gmail Agent Architecture & Workflow Overview](docs/assets/architecture_overview.png)
 
 ```mermaid
 graph TD
-    subgraph Multi-PC Resolution Layer
+    subgraph Multi-PC Resolution & Context Layer
         GCPAuth[gcloud auth login / ADC] --> SecretMgr[Secret Manager]
         SecretMgr -->|gemini-api-key| Config[src/config.py]
         SecretMgr -->|gmail-agent-token| Auth[src/auth.py]
         SecretMgr -->|gmail-oauth-credentials| Auth
+        GCSMemory[GCS gs://...-linkedin-memory] -->|Persona Sync| Persona[src/persona.py]
     end
 
     subgraph Google Cloud Platform
         Scheduler[Cloud Scheduler] -->|Trigger via Configured Cron| CloudRun[Cloud Run Service]
         CloudRun -->|Runs| App[Flask App]
-        App -->|Executes| Main[Main Logic]
-        Main -->|Operational Logs| GCS[Cloud Storage gs://...-gmail-agent-data]
+        App -->|Executes| Main[Main Pipeline]
+        Main -->|Operational Logs| GCSLogs[Cloud Storage gs://...-gmail-agent-data/run_log.json]
         Main -->|Structured Logs| CloudLogging[GCP Cloud Logging]
+        Main <-->|Read / Update Memory| GCSMem[Cloud Storage gs://...-gmail-agent-data/agent_memory.json]
     end
 
-    subgraph Application Logic
-        Main -->|Auth & Fetch| GmailClient[Gmail Client]
-        Main -->|Analyze| Summarizer[AI Summarizer]
-        Summarizer -.->|Summary & Actions| GmailClient
-        GmailClient -.->|Email Content| Summarizer
-        Summarizer -->|Generate Content| GeminiAPI[Gemini 3.8 Flash]
-        GmailClient -->|Send Summaries| GmailAPI[Gmail API]
-        GmailClient -->|Apply Labels| GmailAPI
+    subgraph Cognitive Fast Execution Loop
+        Main -->|Auth & Ingest Unread| GmailClient[Gmail Client]
+        Main -->|Analyze & Triage| Summarizer[AI Summarizer]
+        Persona -->|Context & Focus Areas| Summarizer
+        GCSMem -->|Learned Hints & Guidelines| Summarizer
+        GmailClient -.->|Email Content & RFC 2369| Summarizer
+        Summarizer -->|Cognitive Triage & Briefing| GeminiAPI[Gemini 3.8 Flash]
+        GmailClient -->|Deliver In-Thread Forward| GmailAPI[Gmail API]
+        GmailClient -->|Apply Smart Labels| GmailAPI
     end
 
-    GmailAPI -->|Delivers Summary| User((User))
+    subgraph Self-Improving Slow Reflection Loop
+        GmailAPI -->|Harvest Stars & Label Changes| FeedbackEngine[Feedback Harvester]
+        FeedbackEngine -->|Interaction History| MetaReflect[Gemini Meta-Reflection]
+        MetaReflect -->|Synthesize Optimized Guidelines| GCSMem
+    end
+
+    GmailAPI -->|Delivers Forwarded Briefing| User((User))
 ```
 
 ### Multi-PC Cloud Architecture Strategy
@@ -58,40 +68,48 @@ graph TD
 | **API Keys & Secrets** (`GEMINI_API_KEY`) | **Google Cloud Secret Manager** | Secure string (`secrets/gemini-api-key`) | Dual-mode: Python SDK with fallback to authenticated `gcloud secrets versions access` CLI |
 | **OAuth Tokens** (`token.json`) | **Google Cloud Secret Manager** | Serialized JSON token (`secrets/gmail-agent-token`) | Auto-resolved when local file is missing; in-memory refresh with OS temp cache fallback |
 | **OAuth Client IDs** (`credentials.json`) | **Google Cloud Secret Manager** | Raw client secrets JSON (`secrets/gmail-oauth-credentials`) | Auto-downloaded in-memory on demand if interactive web browser login is triggered |
+| **User Persona Context** | **Google Cloud Storage (GCS)** | `gs://<project-id>-linkedin-memory/linkedin-ghostwriter/profile_memory.json` | Live persona synchronization with linkedin-post-ghostwriter; local temp cache and embedded baseline fallback |
+| **Self-Improving Agent Memory** | **Google Cloud Storage (GCS)** | `gs://<project-id>-gmail-agent-data/gmail-agent/agent_memory.json` | Persistent learned guidelines, sender patterns, and interaction history; local temp cache fallback |
 | **Persistent State** (`state.json`) | **Google Cloud Storage (GCS)** | `gs://<project-id>-gmail-agent-data/gmail-agent/state.json` (`asia-northeast1`) | Regional bucket in Tokyo co-located with Cloud Run; single source of truth; local runs write fallbacks only to OS temp dir (`tempfile.gettempdir()`) |
 | **Operational & Audit Logs** (`run_log.json`) | **Google Cloud Storage & Cloud Logging** | `gs://<project-id>-gmail-agent-data/gmail-agent/run_log.json` + `stdout` | Decoupled from state; streamed to Cloud Logging on Cloud Run and GCS |
 
 ### System Components
 
 *   **Cloud Secret Manager**: Canonical vault storing `gemini-api-key`, `gmail-agent-token`, and `gmail-oauth-credentials`. Allows zero-setup execution on any computer.
-*   **Cloud Storage (GCS)**: Stores decoupled execution logs (`run_log.json`) and agent state without polluting local git workspaces.
+*   **Cloud Storage (GCS)**: Stores decoupled execution logs (`run_log.json`), agent state, persistent persona memory, and self-improving prompt hints (`agent_memory.json`) without polluting local git workspaces.
 *   **Cloud Scheduler**: The configurable "alarm clock" that triggers the system according to your custom cron schedule.
 *   **Cloud Run**: The serverless container compute environment hosting the agent container.
-*   **Gmail Client**: The internal Python module that handles authentication, fetches unread emails, and constructs forwarded summaries.
-*   **AI Summarizer**: The intelligence layer that analyzes emails with Gemini 3.8 Flash.
+*   **Gmail Client**: The internal Python module that handles authentication, fetches unread emails, parses RFC 2369 headers, and constructs forwarded summaries.
+*   **AI Summarizer**: The cognitive intelligence layer that analyzes emails with Gemini 3.8 Flash, applying persona alignment, semantic triage, and adaptive language study extraction.
+*   **Agent Memory Manager**: Manages interaction history, implicit signal harvesting (starred messages, label adjustments), and autonomous prompt reflection.
 
-### Logic Flow
+### Dual-Loop Logic Flow
 
-The application follows a linear execution pipeline, optimized for batch processing:
+The application executes through a coordinated **Fast-Slow Cognitive Architecture**:
 
-1.  **Trigger & Auth**: The Cloud Scheduler triggers the container (or triggered manually/locally). The app authenticates with Gmail using OAuth 2.0.
+#### 1. Fast Execution Pipeline (Per Batch)
+1.  **Trigger & Auth**: The Cloud Scheduler triggers the container (or run manually/locally). The app authenticates with Gmail using OAuth 2.0.
 2.  **Fetch**: Retrieves unread emails from the inbox according to the configured batch limit (default: 20 emails, customizable via `MAX_EMAILS` or CLI).
-3.  **Smart Filtering**:
-    *   **Self-Sent**: Ignores emails sent by the user to avoid loops.
-    *   **Redundancy Check**: Skips threads that have already been summarized by the agent (checks for "Fwd:" from user).
-    *   **Transactional**: Detects and skips purchase receipts, shipping notifications, and invoices (e.g., from Amazon, PayPal) to focus on communication.
-4.  **AI Analysis**:
-    *   The **EmailSummarizer** sends the email body to **Gemini 3.8 Flash**.
-    *   Gemini generates a structured JSON response containing:
-        *   Concise summary.
-        *   Key insights/facts.
-        *   Action required status (True/False) & reason.
+3.  **Echo Guard & Thread Protection**:
+    *   **Self-Sent Echo Guard**: Detects and skips automated forward loops while allowing personal notes/tasks sent to self.
+    *   **Thread Redundancy Check**: Checks whether the *latest* activity in a thread is an agent summary, ensuring new incoming replies from third parties are never missed.
+4.  **Cognitive AI Triage & Analysis**:
+    *   The **EmailSummarizer** evaluates the email content alongside the user's technical persona context and **Accumulated Operational Guidelines** from memory.
+    *   Gemini determines semantic category (`newsletter_article`, `actionable_communication`, `transactional_receipt`, `promotional_noise`, `service_notification`) and optimal triage action:
+        *   **Transactional Receipts**: Categorized, labeled `Receipts`, marked read, and skipped from forwarding clutter.
+        *   **Promotional Noise**: Mark as read without forwarding.
+        *   **Substantive Articles & Communications**: Synthesizes executive summary, key insights, and actionable takeaways.
+        *   **Adaptive Language Study Corner**: Automatically activates whenever text in the user's configured target language is detected across the email or linked articles, providing original sentences, pronunciation guides (e.g. Pinyin with tones, Furigana/Romaji, or stress markers), vocabulary glossaries, and English translations.
 5.  **Action & Notification**:
-    *   **Forward**: The agent forwards the original email to the user, prepending the AI summary and insights.
-    *   **Unsubscribe Link**: If detected, the agent extracts the `unsubscribe`, `opt-out`, or `preferences` link and appends it to the summary for quick management.
-    *   **Chinese Study Corner**: If the email is from `newsletter.ftchinese.com`, a special study section is appended with original text, pinyin, English, and vocabulary. The general summary and insights are excluded to save API resources and avoid duplicate content.
-    *   **Label**: Applies `ActionRequired` or `ReadLater` labels to the original message for easy sorting.
-6.  **Reporting**: A final execution log is sent to the user, detailing processing stats and any errors.
+    *   **Forward**: The agent forwards the original email to the user, prepending the AI summary, insights, and adaptive language study notes.
+    *   **Unsubscribe Link**: Extracts RFC 2369 `List-Unsubscribe` headers or body links for convenient one-click opt-out.
+    *   **Label**: Applies `ActionRequired` or `ReadLater` labels for rapid triage.
+
+#### 2. Slow Reflection Loop (Self-Improvement)
+6.  **Signal Harvesting**: Inspects recent messages in Gmail to detect implicit human feedback (starred messages, spam/trash moves, manual label adjustments).
+7.  **Meta-Reflection**: Analyzes triage decisions against user feedback to synthesize 4–8 authoritative, non-redundant guidelines and prune stale hints.
+8.  **Memory Sync**: Saves the updated guidelines back to GCS (`agent_memory.json`) to guide future execution runs.
+9.  **Reporting**: A final execution log is sent to the user, detailing processing stats (categorized receipts, filtered noise, language study briefings generated) and any errors.
 
 ## Example Output
 
@@ -134,12 +152,54 @@ Reason: Informational newsletter; no reply or task requested.
 - Unsubscribe: [redacted]
 ```
 
-## 🎨 Personalization Showcase
+## 🎨 Adaptive Personalization & Language Learning
+ 
+This agent is built to be completely flexible across diverse users:
+ 
+- **Configurable Language Learning Preference**: Rather than locking into a single language, the agent dynamically adapts to each user's language learning preference (e.g. `TARGET_LEARNING_LANGUAGE="Mandarin Chinese"`, `"Spanish"`, `"Japanese"`, `"French"`, `"German"`, or `None`). When an email or external article contains text in the user's target language, the agent automatically synthesizes:
+  - Original native sentences extracted from the content
+  - Pronunciation and phonetics guides (Pinyin with tone marks, Furigana/Romaji, or stress markers)
+  - Key vocabulary glossaries with contextual definitions
+  - Natural English translations
+- **Persona Context Alignment**: Automatically aligns executive summaries, technical key insights, and actionable recommendations with the user's specific role, industry focus, and technical themes defined in persona memory.
+- **Custom Study Materials**: Extracted language segments and insights can readily feed personalized flashcards, study logs, or NotebookLM audio overviews.
 
-This agent is highly customizable. While it includes built-in support for **Chinese language learning**, the same logic can be applied to any specialized newsletter, technical digest, or specific communication style.
+### 🌐 Configuring Your Language Learning Preference
 
-### ✨ Example: Custom Study Materials
-The agent can be configured to extract content from specific newsletters and transform them into personalized study or reference materials (e.g., custom study guides, flashcards, or NotebookLM-generated audio overviews and presentations).
+You can easily set or change the target learning language across environments without modifying source code:
+
+#### Local Workstations
+Set the environment variable in your terminal session or launch script:
+```powershell
+# Activate Mandarin Chinese (PowerShell)
+$env:TARGET_LEARNING_LANGUAGE="Mandarin Chinese"
+
+# Switch to Spanish or Japanese
+$env:TARGET_LEARNING_LANGUAGE="Spanish"
+
+# Disable language study (standard briefing mode)
+$env:TARGET_LEARNING_LANGUAGE="none"
+```
+
+```bash
+# In Bash / Linux / macOS
+export TARGET_LEARNING_LANGUAGE="Mandarin Chinese"
+```
+
+#### Google Cloud Run
+Update the environment variable on your deployed Cloud Run service in one command:
+```powershell
+# Activate Mandarin Chinese on Cloud Run
+gcloud run services update gmail-agent --region asia-northeast1 --update-env-vars TARGET_LEARNING_LANGUAGE="Mandarin Chinese"
+
+# Switch to Spanish or Japanese
+gcloud run services update gmail-agent --region asia-northeast1 --update-env-vars TARGET_LEARNING_LANGUAGE="Spanish"
+
+# Disable language study (standard briefing mode)
+gcloud run services update gmail-agent --region asia-northeast1 --update-env-vars TARGET_LEARNING_LANGUAGE="none"
+```
+
+
 
 ---
 
@@ -368,16 +428,13 @@ If you run the agent on your Windows computer using Task Scheduler:
 2. Select your `Gmail Agent` task and click **Properties** > **Triggers** tab.
 3. Edit the trigger to set your preferred interval (e.g., daily at specific hours, or repeat every 15/30/60 minutes).
 
-### Purchase Keywords
+### Self-Improving Operational Memory (`agent_memory.json`)
 
-Edit `src/summarizer.py` to customize purchase detection:
-
-```python
-purchase_keywords = [
-    'order', 'purchase', 'receipt', 'invoice', 'payment',
-    # Add more keywords
-]
-```
+The agent eliminates hardcoded keyword matching in favor of autonomous learning:
+- **Persistent Cognitive Memory**: Persisted to Google Cloud Storage at `gs://<GCS_BUCKET_NAME>/gmail-agent/agent_memory.json` (with local OS temp directory fallback).
+- **Feedback Signal Harvesting**: After processing, the agent checks recent messages to detect if the user starred them (positive priority signal) or trashed/marked as spam (deprioritization signal).
+- **Meta-Reflection**: Gemini autonomously analyzes recent interactions and feedback signals to formulate 4–8 authoritative operational guidelines, pruning obsolete rules.
+- **Dynamic In-Context Injection**: Learned guidelines are automatically injected into future prompt executions alongside the user persona context.
 
 ## Multi-PC Zero-Setup Execution
 
@@ -425,15 +482,17 @@ gmail-agent/
 │   └── run_agent.bat       # Windows executable & Task Scheduler launcher
 └── src/
     ├── __init__.py         # Package marker & exported module declarations
+    ├── agent_memory.py     # Self-improving memory, feedback harvesting, & reflection
     ├── app.py              # Flask HTTP webhook entry point for Cloud Run
     ├── auth.py             # Dual-mode multi-PC Gmail OAuth 2.0 resolver
     ├── briefing.py         # Concise plain-text email briefing formatter
     ├── config.py           # Centralized configuration & Secret Manager resolution
     ├── content_fetcher.py  # Multi-modal web, YouTube, podcast content scraper & login guards
-    ├── gmail_client.py     # Gmail API client & RFC 822 MIME message builder
-    ├── main.py             # End-to-end batch processing pipeline & CLI runner
+    ├── gmail_client.py     # Gmail API client, RFC 2369 header parser, & MIME message builder
+    ├── main.py             # Dual-loop execution pipeline, cognitive triage, & CLI runner
+    ├── persona.py          # User persona context & adaptable language detection
     ├── storage.py          # Google Cloud Storage state & decoupled run logging
-    └── summarizer.py       # AI executive summarization engine (Gemini 3.8 Flash)
+    └── summarizer.py       # Cognitive triage & AI executive summarization engine
 ```
 
 ## Cost Estimate
