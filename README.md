@@ -101,7 +101,7 @@ The application operates through two coordinated, complementary mechanisms: an *
         *   **Substantive Articles & Communications**: Synthesizes executive summary, key insights, and actionable takeaways.
         *   **Adaptive Language Study Corner**: Automatically activates whenever text in the user's configured target language is detected across the email or linked articles, providing original sentences, pronunciation guides (e.g. Pinyin with tones, Furigana/Romaji, or stress markers), vocabulary glossaries, and English translations.
 5.  **Action & Notification**:
-    *   **Forward**: The agent forwards the original email to the user, prepending the AI summary, insights, and adaptive language study notes.
+    *   **Forward**: The agent forwards the original email to the user with a concise HTML briefing and a matching plain-text alternative, followed by the original message as an attached RFC 822 message (`original.eml`).
     *   **Unsubscribe Link**: Extracts RFC 2369 `List-Unsubscribe` headers or body links for convenient one-click opt-out.
     *   **Label**: Applies `ActionRequired` or `ReadLater` labels for rapid triage.
 
@@ -120,37 +120,55 @@ and links are generalized:
 Subject: Making business travel count
 From: Professional newsletter
 
-💡 Summary & insights
-The main interview argues that business travel can build relationships and
-professional perspective, rather than being only a sequence of meetings. It
-connects trip quality to intentional planning, adequate rest, and opportunities
-to experience a destination. The wider newsletter also covers career and
-workplace developments.
-- Retention signal: Nearly 60% of business travelers add personal days to work
-  trips. The interview frames this as a potential morale and retention benefit
-  because the employer's flight is already paid for.
-- Sustainable itineraries: Back-to-back meetings and poor sleep reduce the
-  value of travel; protected downtime and local exploration can support energy
-  and more meaningful engagement.
-- Small-business friction: Self-booking owners lose time comparing options.
-  Faster rebooking and preference-aware lodging address a practical
-  productivity cost for teams without travel departments.
+Summary
+The interview argues that well-planned business travel can strengthen working
+relationships and broaden perspective. It suggests that rest and time outside
+meetings help make a trip more useful.
 
-🌐 External source findings
+Key insights
+- Retention signal: The interview says many travelers add personal days to
+  work trips, which may make travel more appealing to employees.
+- Sustainable itineraries: Packed schedules leave little room to recover or
+  build relationships. Protected downtime can help.
+- Small-business friction: Owners who book their own travel spend time
+  comparing options and handling changes.
+
+External source findings
 The linked newsletter page adds publication and archive context, placing this
 interview within recurring coverage of career moves, professional learning,
 and industry trends.
 
-⚡ Takeaways
-- Separate essential work commitments from optional recovery and exploration
-  time when planning business itineraries.
+Things to watch
+- Whether travel schedules leave enough time for rest and useful conversations.
+- Whether simpler booking and rebooking would save staff time.
 
-🎯 Action required: No
+Action required
+No
 Reason: Informational newsletter; no reply or task requested.
 
-🔗 Links
+Links
 - Unsubscribe: [redacted]
 ```
+
+The forwarded message displays this content in a lightly styled HTML layout when supported by the email client. The plain-text version above remains available as the alternative.
+
+## Technical & Architectural Decisions
+
+- **Zero-Local-Secret Cloud Architecture**:
+  - *Decision*: Centralize all credentials, OAuth refresh tokens, and runtime keys in Google Cloud Secret Manager (`gemini-api-key`, `gmail-agent-token`, `gmail-oauth-credentials`) with automated dual-mode fallback (Python SDK &rarr; `gcloud` CLI &rarr; OS temporary caching) instead of local `.env` files.
+  - *Rationale*: Eliminates machine-specific credential files, guarantees zero sensitive tokens leak into version control, and allows instantaneous multi-PC portability and seamless Cloud Run execution.
+
+- **Dual-View MIME Briefing Delivery**:
+  - *Decision*: Deliver briefings as a `multipart/mixed` container holding a `multipart/alternative` body (restrained, accessible HTML and clean plain-text) with the complete raw original email attached as `message/rfc822` (`original.eml`).
+  - *Rationale*: Delivers visual clarity and typography in modern email clients while ensuring fallback support for terminal clients and screen readers, all while preserving the raw original email for thread continuity, replies, and attachments.
+
+- **Autonomous Self-Improvement via Implicit Feedback Harvesting**:
+  - *Decision*: Maintain an adaptive operational memory (`agent_memory.json`) in Google Cloud Storage populated through a reflection loop that correlates user Gmail interactions (starred items, manual label changes, spam marks) with Gemini meta-reflection, rather than brittle manual rule configuration.
+  - *Rationale*: Allows triage precision and domain persona calibration to continuously self-tune based on natural user behavior without ongoing code edits.
+
+- **Multi-Modal External Source Ingestion with Anti-Paywall Guards**:
+  - *Decision*: Ingest referenced web articles, YouTube transcripts, and podcast summaries directly with automated login-wall detection, bot-check discarding, and tracking-parameter stripping.
+  - *Rationale*: Enriches Gemini's briefings with full-text primary source evidence beyond shallow email previews while gracefully falling back to email content if access barriers or network timeouts occur.
 
 ## 🎨 Adaptive Personalization & Language Learning
  
@@ -485,7 +503,7 @@ gmail-agent/
     ├── agent_memory.py     # Self-improving memory, feedback harvesting, & reflection
     ├── app.py              # Flask HTTP webhook entry point for Cloud Run
     ├── auth.py             # Dual-mode multi-PC Gmail OAuth 2.0 resolver
-    ├── briefing.py         # Concise plain-text email briefing formatter
+    ├── briefing.py         # Plain-text and responsive HTML email briefing formatter
     ├── config.py           # Centralized configuration & Secret Manager resolution
     ├── content_fetcher.py  # Multi-modal web, YouTube, podcast content scraper & login guards
     ├── gmail_client.py     # Gmail API client, RFC 2369 header parser, & MIME message builder

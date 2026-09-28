@@ -13,7 +13,7 @@ Key Capabilities:
     2. Thread Summarization Inspection:
        Checks existing thread messages to prevent redundant duplicate summaries.
     3. Multipart MIME Construction:
-       Embeds AI summaries as plain text while attaching the raw RFC 822 original message
+       Embeds AI summaries as plain text and HTML while attaching the raw RFC 822 original message
        via `MIMEMessage`, setting `In-Reply-To`, `References`, and `threadId` headers.
     4. Label Management:
        Auto-creates and applies organizational labels (`ActionRequired`, `ReadLater`).
@@ -278,6 +278,7 @@ class GmailClient:
         original_msg_id: str,
         to: str,
         summary_text: str,
+        summary_html: str | None = None,
     ) -> dict[str, Any] | None:
         """
         Forwards a message with AI summary prepended and original email embedded,
@@ -286,7 +287,7 @@ class GmailClient:
         MIME Composition:
             - Extracts the raw RFC 822 bytes of the original email.
             - Constructs a `multipart/mixed` container.
-            - Part 1: AI summary plain text.
+            - Part 1: AI summary as multipart/alternative (plain text and HTML).
             - Part 2: `message/rfc822` containing the entire original email.
             - Sets `In-Reply-To`, `References`, and `threadId` headers for thread continuity.
 
@@ -294,6 +295,7 @@ class GmailClient:
             original_msg_id: ID of the original message to forward.
             to: Target recipient email address.
             summary_text: AI-generated summary content to prepend.
+            summary_html: Optional HTML rendering of the same summary.
 
         Returns:
             Gmail API message response dictionary, or None on failure.
@@ -320,12 +322,16 @@ class GmailClient:
                 refs = original_email.get("References", "")
                 msg["References"] = (refs + " " + original_email.get("Message-ID")).strip()
 
-            # Step 4: Attach AI summary (plain text with explicit UTF-8 encoding)
-            summary_part = MIMEText(summary_text, "plain", "utf-8")
+            # Step 4: Put both briefing views in one alternative part.
+            summary_part = MIMEMultipart("alternative")
+            summary_part.attach(MIMEText(summary_text, "plain", "utf-8"))
+            if summary_html:
+                summary_part.attach(MIMEText(summary_html, "html", "utf-8"))
             msg.attach(summary_part)
 
             # Step 5: Attach original email as message/rfc822
             original_msg_part = MIMEMessage(original_email)
+            original_msg_part.add_header("Content-Disposition", "attachment", filename="original.eml")
             msg.attach(original_msg_part)
 
             # Step 6: Dispatch message bound to the original threadId

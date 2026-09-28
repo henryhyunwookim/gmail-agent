@@ -313,16 +313,16 @@ You must respond with ONLY valid JSON in this exact structure (no markdown fence
 {{
     "category": "newsletter_article | actionable_communication | transactional_receipt | service_notification | promotional_noise",
     "triage_action": "forward_briefing | skip_receipt | skip_noise",
-    "executive_summary": "A substantive 3-5 sentence synthesis of the core narrative, relevant context, architectural/strategic stakes, and key developments.",
+    "executive_summary": "Two short, plain-language sentences: what happened or is being argued, then why it matters to the recipient. Attribute reported or unverified claims to the email or named source.",
     "key_insights": [
         {{
-            "topic": "Short topic name",
-            "details": "Evidence-based technical analysis of mechanisms, trade-offs, systems implications, or strategic significance. Tailored for {recipient_headline}."
+            "topic": "Short, concrete topic name",
+            "details": "One or two concise sentences explaining a distinct finding and why it matters to {recipient_headline}. Attribute specific claims to their source."
         }}
     ],
-    "external_source_highlights": "Substantive evidence, data points, or arguments found in the fetched external sources that were missing from the email preview; return null if no external source was ingested.",
+    "external_source_highlights": "One concise, attributed finding only if a fetched source adds information absent from the email and other sections; otherwise null.",
     "actionable_takeaways": [
-        "Practical recommendation, follow-up consideration, or implication grounded in the text"
+        "Brief concrete next step if action is required; otherwise a neutral thing to watch or consider"
     ],
     "action_required": false,
     "reason": "Brief one-sentence explanation of why action is or is not required from {recipient_name}",
@@ -349,6 +349,10 @@ TRIAGE & REASONING RULES:
    - "service_notification": Automated cloud/platform alerts; set "forward_briefing" only if urgent/actionable, else "skip_noise".
 2. Persona Calibration:
    - Highlight technical architecture, agentic workflows, serverless implications, digital transformation, and systemic trade-offs. Avoid shallow platitudes or repeating marketing taglines.
+   - Write for a busy reader: use familiar words, define necessary jargon once, and prefer short sentences. Keep the summary to two sentences, key_insights to at most three distinct items, and actionable_takeaways to at most three brief items.
+   - Do not repeat the same point across summary, insights, external_source_highlights, and takeaways. Reserve CVE numbers, legal references, and other dense details for cases where they change the conclusion.
+   - Attribute specific incidents, figures, and policy claims to the email or a named source. If a claim cannot be verified from the supplied content, describe it as a report or assertion, not an established fact. Do not invent citations.
+   - When action_required is false, make takeaways neutral watch points rather than instructions. Omit an empty or redundant external_source_highlights section by returning null.
 {lang_study_rule}
 4. Action Required:
    - true ONLY if {recipient_name} needs to reply, make an approval, or take concrete action. Newsletters or informative reads are false.

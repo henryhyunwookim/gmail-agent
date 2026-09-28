@@ -32,7 +32,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from src.auth import authenticate_gmail
-from src.briefing import compose_briefing
+from src.briefing import compose_briefing, compose_briefing_html
 from src.config import (
     DEFAULT_MAX_EMAILS,
     get_gemini_api_key,
@@ -223,7 +223,8 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                     stats["processed"] += 1
                 else:
                     print(f"Forwarding to {user_email}...")
-                    client.forward_message(msg_id, user_email, summary_text)
+                    summary_html = compose_briefing_html(content, analysis)
+                    client.forward_message(msg_id, user_email, summary_text, summary_html)
 
                     # Categorize message with appropriate Gmail label
                     label = "ActionRequired" if analysis.get("action_required") else "ReadLater"
