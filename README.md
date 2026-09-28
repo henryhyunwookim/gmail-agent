@@ -101,7 +101,7 @@ The application operates through two coordinated, complementary mechanisms: an *
         *   **Substantive Articles & Communications**: Synthesizes executive summary, key insights, and actionable takeaways.
         *   **Adaptive Language Study Corner**: Automatically activates whenever text in the user's configured target language is detected across the email or linked articles, providing original sentences, pronunciation guides (e.g. Pinyin with tones, Furigana/Romaji, or stress markers), vocabulary glossaries, and English translations.
 5.  **Action & Notification**:
-    *   **Forward**: The agent forwards the original email to the user with a concise HTML briefing and a matching plain-text alternative, followed by the original message as an attached RFC 822 message (`original.eml`).
+    *   **Forward**: The agent forwards the original email to the user with a streamlined HTML briefing (opening directly with the executive summary) and a matching plain-text alternative, followed by the original message as an attached RFC 822 message (`original.eml`).
     *   **Unsubscribe Link**: Extracts RFC 2369 `List-Unsubscribe` headers or body links for convenient one-click opt-out.
     *   **Label**: Applies `ActionRequired` or `ReadLater` labels for rapid triage.
 
@@ -158,9 +158,9 @@ The forwarded message displays this content in a lightly styled HTML layout when
   - *Decision*: Centralize all credentials, OAuth refresh tokens, and runtime keys in Google Cloud Secret Manager (`gemini-api-key`, `gmail-agent-token`, `gmail-oauth-credentials`) with automated dual-mode fallback (Python SDK &rarr; `gcloud` CLI &rarr; OS temporary caching) instead of local `.env` files.
   - *Rationale*: Eliminates machine-specific credential files, guarantees zero sensitive tokens leak into version control, and allows instantaneous multi-PC portability and seamless Cloud Run execution.
 
-- **Dual-View MIME Briefing Delivery**:
-  - *Decision*: Deliver briefings as a `multipart/mixed` container holding a `multipart/alternative` body (restrained, accessible HTML and clean plain-text) with the complete raw original email attached as `message/rfc822` (`original.eml`).
-  - *Rationale*: Delivers visual clarity and typography in modern email clients while ensuring fallback support for terminal clients and screen readers, all while preserving the raw original email for thread continuity, replies, and attachments.
+- **Dual-View MIME Briefing Delivery & Streamlined Layout**:
+  - *Decision*: Deliver briefings as a `multipart/mixed` container holding a `multipart/alternative` body (restrained, accessible HTML and clean plain-text) with the complete raw original email attached as `message/rfc822` (`original.eml`). The HTML presentation is streamlined to start directly with the executive summary, eliminating redundant "Email briefing" title headers and metadata blocks already native to the Gmail client interface.
+  - *Rationale*: Maximizes immediate reading clarity and mobile scannability in modern email clients without top-heavy clutter, while maintaining full accessibility and preserving the raw RFC 822 original for thread continuity, replies, and attachments.
 
 - **Autonomous Self-Improvement via Implicit Feedback Harvesting**:
   - *Decision*: Maintain an adaptive operational memory (`agent_memory.json`) in Google Cloud Storage populated through a reflection loop that correlates user Gmail interactions (starred items, manual label changes, spam marks) with Gemini meta-reflection, rather than brittle manual rule configuration.

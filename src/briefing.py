@@ -133,8 +133,9 @@ def compose_briefing_html(
     sections = []
 
     def section(title: str, body: str) -> None:
+        border_style = 'border-top:1px solid #e5e7eb;padding:20px 0 2px' if sections else 'padding:0 0 2px'
         sections.append(
-            '<section style="border-top:1px solid #e5e7eb;padding:20px 0 2px">'
+            f'<section style="{border_style}">'
             f'<h2 style="font-size:16px;line-height:1.4;margin:0 0 10px;color:#1f2937">{escape(title)}</h2>'
             f'{body}</section>'
         )
@@ -182,17 +183,11 @@ def compose_briefing_html(
             f'<li style="margin:0 0 8px"><a href="{escape(url, quote=True)}" style="color:#315b7c">{escape(label)}</a></li>'
             for label, url in data["links"]
         ) + '</ul>')
-    metadata = ''.join(
-        f'<p style="margin:0 0 4px;color:#6b7280;font-size:13px">{label}: {escape(value)}</p>'
-        for label, value in (("Subject", data["subject"]), ("From", data["sender"])) if value
-    )
     return (
         '<!doctype html><html><head><meta charset="utf-8"></head>'
         '<body style="margin:0;padding:24px 12px;background:#f8fafc;color:#374151;'
         'font:15px/1.6 Arial,Helvetica,sans-serif">'
         '<div style="max-width:640px;margin:0 auto;padding:24px;background:#fff;'
         'border:1px solid #e5e7eb;border-radius:8px">'
-        '<header style="padding-bottom:16px"><h1 style="font-size:20px;line-height:1.3;'
-        f'margin:0 0 12px;color:#111827">Email briefing</h1>{metadata}</header>'
         + ''.join(sections) + '</div></body></html>'
     )
