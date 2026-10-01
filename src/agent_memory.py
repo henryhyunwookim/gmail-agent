@@ -340,7 +340,7 @@ TASK:
 1. Identify recurring patterns, edge cases, or false positives in categorization and action requirements.
 2. Formulate 4 to 8 crisp, authoritative operational rules that will guide the summarizer in future runs.
 3. Keep rules concise, concrete, actionable, and non-redundant. Focus on system architecture depth, receipt categorization, and accurate action detection.
-4. Generate briefings for all non-receipt messages, including promotional messages and service notices. Use learned preferences to tailor emphasis and detail. Base improvements on user feedback; model classifications alone do not establish user preferences.
+4. Generate briefings for all non-receipt messages. Tailor emphasis and detail to preferences supported by user feedback.
 
 Respond with ONLY valid JSON:
 {{
