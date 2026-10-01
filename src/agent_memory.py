@@ -340,6 +340,7 @@ TASK:
 1. Identify recurring patterns, edge cases, or false positives in categorization and action requirements.
 2. Formulate 4 to 8 crisp, authoritative operational rules that will guide the summarizer in future runs.
 3. Keep rules concise, concrete, actionable, and non-redundant. Focus on system architecture depth, transactional noise filtering, and accurate action detection.
+4. Preserve informative messages even when commercially branded or nonurgent. Never learn blanket skip rules based on keywords, sender domains, unsubscribe links, or lack of immediate action. Prior triage decisions are model predictions, not verified user feedback; do not reinforce them as ground truth. Sender feedback is a preference signal, not proof that every message from that sender is noise.
 
 Respond with ONLY valid JSON:
 {{

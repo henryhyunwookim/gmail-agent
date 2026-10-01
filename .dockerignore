@@ -1,5 +1,7 @@
 # Secrets & credentials — resolved from Secret Manager at runtime
 .env
+.env.*
+*.token
 *.env.*
 credentials.json
 token.json
@@ -32,6 +34,13 @@ tests/
 test/
 scratch/
 tmp/
+temp/
+__tests__/
+*.test.*
+*.spec.*
+.coverage
+dist/
+build/
 
 # Editor & OS files
 .vscode/

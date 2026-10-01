@@ -97,8 +97,8 @@ The application operates through two coordinated, complementary mechanisms: an *
     *   The **EmailSummarizer** evaluates the email content alongside the user's technical persona context and **Accumulated Operational Guidelines** from memory.
     *   Gemini determines semantic category (`newsletter_article`, `actionable_communication`, `transactional_receipt`, `promotional_noise`, `service_notification`) and optimal triage action:
         *   **Transactional Receipts**: Categorized, labeled `Receipts`, marked read, and skipped from forwarding clutter.
-        *   **Promotional Noise**: Mark as read without forwarding.
-        *   **Substantive Articles & Communications**: Synthesizes executive summary, key insights, and actionable takeaways.
+        *   **Promotional Noise**: Mark as read without forwarding only when the category and skip action agree, model confidence is at least 0.9, and a supporting excerpt matches the email body. Routine service notices require the same checks. Model confidence is self-reported, not a measured accuracy guarantee.
+        *   **Substantive Articles & Communications**: Synthesizes executive summary, key insights, and actionable takeaways. Preserve informative newsletters, tutorials, and substantive service updates even when commercially branded or nonurgent; uncertain, unsupported, or conflicting skip decisions default to a briefing. This favors retaining useful information at the cost of occasionally forwarding noise.
         *   **Adaptive Language Study Corner**: Automatically activates whenever text in the user's configured target language is detected across the email or linked articles, providing original sentences, pronunciation guides (e.g. Pinyin with tones, Furigana/Romaji, or stress markers), vocabulary glossaries, and English translations.
 5.  **Action & Notification**:
     *   **Forward**: The agent forwards the original email to the user with a streamlined HTML briefing (opening directly with the executive summary) and a matching plain-text alternative, followed by the original message as an attached RFC 822 message (`original.eml`).
@@ -453,6 +453,7 @@ The agent eliminates hardcoded keyword matching in favor of autonomous learning:
 - **Feedback Signal Harvesting**: After processing, the agent checks recent messages to detect if the user starred them (positive priority signal) or trashed/marked as spam (deprioritization signal).
 - **Meta-Reflection**: Gemini autonomously analyzes recent interactions and feedback signals to formulate 4–8 authoritative operational guidelines, pruning obsolete rules.
 - **Dynamic In-Context Injection**: Learned guidelines are automatically injected into future prompt executions alongside the user persona context.
+- **Classification Safeguards**: Reflection is instructed to avoid blanket keyword or sender skip rules and to treat past model decisions as predictions rather than verified feedback. Learned preferences guide briefing emphasis without overriding preservation of informative content.
 
 ## Multi-PC Zero-Setup Execution
 

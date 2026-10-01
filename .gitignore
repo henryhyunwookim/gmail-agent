@@ -9,6 +9,7 @@ token.json
 .env.local
 .env.*.local
 *.key
+*.token
 *.pem
 *.p12
 service_account*.json

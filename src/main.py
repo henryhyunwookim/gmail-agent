@@ -181,7 +181,7 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                 category = analysis.get("category", "newsletter_article")
 
                 # Filter 4c: Intelligent Transactional Receipt Handling
-                if triage_action == "skip_receipt" or category == "transactional_receipt":
+                if triage_action == "skip_receipt" and category == "transactional_receipt":
                     stats["receipts_categorized"] += 1
                     print(f"Intelligently categorized as transactional receipt: {content.get('subject')}")
                     if not dry_run:
@@ -190,9 +190,10 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                     continue
 
                 # Filter 4d: Intelligent Promotional Noise Filtering
-                if triage_action == "skip_noise" or category == "promotional_noise":
+                if triage_action == "skip_noise" and category in {"promotional_noise", "service_notification"}:
                     stats["noise_filtered"] += 1
                     print(f"Intelligently filtered low-value promotional noise: {content.get('subject')}")
+                    print(f"Triage reason: {analysis.get('classification_reason', '')}")
                     if not dry_run:
                         client.mark_as_read(msg_id)
                     continue
