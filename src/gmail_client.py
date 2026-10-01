@@ -456,7 +456,6 @@ Execution Time: {execution_time}
 Total unread emails: {stats.get('total', 0)}
 Processed & forwarded: {stats.get('processed', 0)}
 Categorized (receipts): {stats.get('receipts_categorized', stats.get('purchase', 0))}
-Filtered (promotional noise): {stats.get('noise_filtered', 0)}
 Filtered (already summarized): {stats.get('already_summarized', 0)}
 Filtered (echo / self-sent): {stats.get('self_sent', 0)}
 Language study briefings: {stats.get('language_study_generated', stats.get('chinese_study_generated', 0))}

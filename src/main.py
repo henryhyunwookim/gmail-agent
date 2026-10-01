@@ -90,7 +90,6 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
         "total": 0,
         "self_sent": 0,
         "receipts_categorized": 0,
-        "noise_filtered": 0,
         "already_summarized": 0,
         "processed": 0,
         "language_study_generated": 0,
@@ -189,15 +188,6 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
                         client.mark_as_read(msg_id)
                     continue
 
-                # Filter 4d: Intelligent Promotional Noise Filtering
-                if triage_action == "skip_noise" and category in {"promotional_noise", "service_notification"}:
-                    stats["noise_filtered"] += 1
-                    print(f"Intelligently filtered low-value promotional noise: {content.get('subject')}")
-                    print(f"Triage reason: {analysis.get('classification_reason', '')}")
-                    if not dry_run:
-                        client.mark_as_read(msg_id)
-                    continue
-
                 # Stage 5 (cont): Process Forwardable Intelligence
                 ext_sources = analysis.get("external_sources", [])
                 stats["external_sources_fetched"] += len(ext_sources)
@@ -243,7 +233,6 @@ def main(max_results: int | None = None, dry_run: bool = False) -> dict[str, Any
         print(f"Total unread emails: {stats['total']}")
         print(f"Processed & forwarded: {stats['processed']}")
         print(f"Categorized as receipts: {stats['receipts_categorized']}")
-        print(f"Filtered (promotional noise): {stats['noise_filtered']}")
         print(f"Filtered (echo / self-sent): {stats['self_sent']}")
         print(f"Filtered (already summarized): {stats['already_summarized']}")
         print(f"Language study briefings: {stats['language_study_generated']}")

@@ -5,12 +5,12 @@ An intelligent email assistant that automatically summarizes your unread Gmail e
 ## Features
 
 - 📰 **Executive-Grade Intelligence Briefings**: Delivers deep technical, strategic, and domain-specific context, background significance, and practical takeaways tailored to your professional focus.
-- 🧠 **Context-Aware Persona Alignment**: Dynamically aligns with each user's configurable profile, role, and domain priorities (e.g. software engineering, research, leadership, or product management), prioritizing high-signal subject matter while filtering routine noise.
+- 🧠 **Context-Aware Persona Alignment**: Dynamically aligns with each user's configurable profile, role, and domain priorities (e.g. software engineering, research, leadership, or product management), prioritizing high-signal subject matter when preparing briefings.
 - 🌐 **External Content & Media Ingestion**: Automatically detects linked web articles, YouTube videos (extracting audio transcripts), and podcasts, analyzing full source content beyond initial email previews.
 - 💡 **Deep-Dive Key Insights**: Breaks down emails and linked sources into rich, analytical thematic sections with specific facts, data points, and systems-level implications.
 - ⚡ **Actionable Takeaways**: Clearly highlights key next steps, decisions, and recommendations.
 - 📚 **Adaptive Language Learning Corner**: Dynamically adapts to each user's language learning preference (e.g. Mandarin Chinese, Spanish, Japanese, French, German, or disabled). When content in the user's target language is detected across newsletters or articles, it automatically generates a sentence-by-sentence educational breakdown (Original text, Pronunciation/Phonetics, Vocabulary glossary, English translation).
-- 🎯 **Cognitive Triage & Auto-Labeling**: Intelligently categorizes emails into actionable communications (`ActionRequired`), valuable reading (`ReadLater`), routine transactional notices (`Receipts`), or filtered noise.
+- 🎯 **Cognitive Triage & Auto-Labeling**: Intelligently categorizes emails into actionable communications (`ActionRequired`), valuable reading (`ReadLater`), routine transactional notices (`Receipts`), and promotional messages (also briefed).
 - 🔗 **Smart Link Architecture**: Preserves hyperlinks and extracts RFC 2369 `List-Unsubscribe` headers and body opt-out links for seamless one-click management.
 - ⚙️ **Configurable Limits & Schedule**: Easily adjust batch limits (`DEFAULT_MAX_EMAILS = 20`), external link ingestion (`ENABLE_EXTERNAL_FETCH`), body character limits (`MAX_BODY_CHARS`), and cron schedules.
 - ☁️ **Cloud Native & Multi-PC Portable**: Runs seamlessly on local Windows/macOS/Linux or serverless on Google Cloud Run.
@@ -97,8 +97,8 @@ The application operates through two coordinated, complementary mechanisms: an *
     *   The **EmailSummarizer** evaluates the email content alongside the user's technical persona context and **Accumulated Operational Guidelines** from memory.
     *   Gemini determines semantic category (`newsletter_article`, `actionable_communication`, `transactional_receipt`, `promotional_noise`, `service_notification`) and optimal triage action:
         *   **Transactional Receipts**: Categorized, labeled `Receipts`, marked read, and skipped from forwarding clutter.
-        *   **Promotional Noise**: Mark as read without forwarding only when the category and skip action agree, model confidence is at least 0.9, and a supporting excerpt matches the email body. Routine service notices require the same checks. Model confidence is self-reported, not a measured accuracy guarantee.
-        *   **Substantive Articles & Communications**: Synthesizes executive summary, key insights, and actionable takeaways. Preserve informative newsletters, tutorials, and substantive service updates even when commercially branded or nonurgent; uncertain, unsupported, or conflicting skip decisions default to a briefing. This favors retaining useful information at the cost of occasionally forwarding noise.
+        *   **Promotional Messages & Service Notices**: Receive a neutral briefing of their offers, announcements, or account updates.
+        *   **Substantive Articles & Communications**: Synthesizes executive summary, key insights, and actionable takeaways, including commercially branded or nonurgent content.
         *   **Adaptive Language Study Corner**: Automatically activates whenever text in the user's configured target language is detected across the email or linked articles, providing original sentences, pronunciation guides (e.g. Pinyin with tones, Furigana/Romaji, or stress markers), vocabulary glossaries, and English translations.
 5.  **Action & Notification**:
     *   **Forward**: The agent forwards the original email to the user with a streamlined HTML briefing (opening directly with the executive summary) and a matching plain-text alternative, followed by the original message as an attached RFC 822 message (`original.eml`).
@@ -109,7 +109,7 @@ The application operates through two coordinated, complementary mechanisms: an *
 6.  **Signal Harvesting**: Inspects recent messages in Gmail to detect implicit human feedback (starred messages, spam/trash moves, manual label adjustments).
 7.  **Meta-Reflection**: Analyzes triage decisions against user feedback to synthesize 4–8 authoritative, non-redundant guidelines and prune stale hints.
 8.  **Memory Sync**: Saves the updated guidelines back to GCS (`agent_memory.json`) to guide future execution runs.
-9.  **Reporting**: A final execution log is sent to the user, detailing processing stats (categorized receipts, filtered noise, language study briefings generated) and any errors.
+9.  **Reporting**: A final execution log is sent to the user, detailing processing stats (categorized receipts, language study briefings generated) and any errors.
 
 ## Example Output
 
@@ -453,7 +453,7 @@ The agent eliminates hardcoded keyword matching in favor of autonomous learning:
 - **Feedback Signal Harvesting**: After processing, the agent checks recent messages to detect if the user starred them (positive priority signal) or trashed/marked as spam (deprioritization signal).
 - **Meta-Reflection**: Gemini autonomously analyzes recent interactions and feedback signals to formulate 4–8 authoritative operational guidelines, pruning obsolete rules.
 - **Dynamic In-Context Injection**: Learned guidelines are automatically injected into future prompt executions alongside the user persona context.
-- **Classification Safeguards**: Reflection is instructed to avoid blanket keyword or sender skip rules and to treat past model decisions as predictions rather than verified feedback. Learned preferences guide briefing emphasis without overriding preservation of informative content.
+- **Briefing Policy**: All non-receipt messages receive briefings. Persona context and learned preferences tailor emphasis and detail; user feedback informs preference updates.
 
 ## Multi-PC Zero-Setup Execution
 
