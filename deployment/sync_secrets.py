@@ -125,13 +125,23 @@ def sync_secret(secret_name: str, payload_str: str, project_id: str) -> bool:
             )
 
         # Add new secret version with payload
-        client.add_secret_version(
+        new_version = client.add_secret_version(
             request={
                 "parent": secret_path,
                 "payload": {"data": payload_str.encode("utf-8")},
             }
         )
         print(f"[+] Successfully synced '{secret_name}' via SDK.")
+
+        # Auto-prune old versions
+        try:
+            new_v_id = new_version.name.split("/")[-1]
+            for v in client.list_secret_versions(request={"parent": secret_path}):
+                if v.name.split("/")[-1] != new_v_id and v.state == secretmanager.SecretVersion.State.ENABLED:
+                    client.destroy_secret_version(request={"name": v.name})
+        except Exception:
+            pass
+
         return True
     except Exception as sdk_err:
         print(f"    SDK sync failed ({sdk_err}), falling back to gcloud CLI...")
@@ -175,6 +185,20 @@ def sync_secret(secret_name: str, payload_str: str, project_id: str) -> bool:
             ]
             subprocess.run(add_cmd, check=True, capture_output=True, text=True, timeout=15, shell=is_win)
             print(f"[+] Successfully synced '{secret_name}' via gcloud CLI.")
+
+            # Auto-prune old versions via gcloud CLI
+            try:
+                list_cmd = ["gcloud", "secrets", "versions", "list", secret_name, f"--project={project_id}", "--filter=state:ENABLED", "--format=value(name)"]
+                list_res = subprocess.run(list_cmd, capture_output=True, text=True, shell=is_win)
+                if list_res.returncode == 0:
+                    active_vers = [v.strip().split("/")[-1] for v in list_res.stdout.splitlines() if v.strip()]
+                    if len(active_vers) > 1:
+                        sorted_vers = sorted(active_vers, key=lambda x: int(x) if x.isdigit() else 0, reverse=True)
+                        for old_v in sorted_vers[1:]:
+                            subprocess.run(["gcloud", "secrets", "versions", "destroy", old_v, f"--secret={secret_name}", f"--project={project_id}", "--quiet"], shell=is_win, capture_output=True)
+            except Exception:
+                pass
+
             return True
         finally:
             if os.path.exists(temp_file):

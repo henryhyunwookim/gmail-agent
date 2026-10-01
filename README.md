@@ -75,7 +75,7 @@ flowchart TD
 
 ### System Components
 
-*   **Cloud Secret Manager**: Canonical vault storing `gemini-api-key`, `gmail-agent-token`, and `gmail-oauth-credentials`. Allows zero-setup execution on any computer.
+*   **Cloud Secret Manager**: Canonical vault storing `gemini-api-key`, `gmail-agent-token`, and `gmail-oauth-credentials`. Allows zero-setup execution on any computer. Features automated single-version retention: whenever OAuth tokens refresh or credentials sync, obsolete versions are immediately destroyed to strictly enforce the GCP free tier (<= 6 active versions).
 *   **Cloud Storage (GCS)**: Stores decoupled execution logs (`run_log.json`), agent state, persistent persona memory, and self-improving prompt hints (`agent_memory.json`) without polluting local git workspaces.
 *   **Cloud Scheduler**: The configurable "alarm clock" that triggers the system according to your custom cron schedule.
 *   **Cloud Run**: The serverless container compute environment hosting the agent container.
