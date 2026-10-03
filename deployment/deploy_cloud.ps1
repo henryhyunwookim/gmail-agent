@@ -193,7 +193,8 @@ if ($jobExists) {
         --time-zone=$TARGET_TIMEZONE `
         --uri=$SERVICE_URL `
         --http-method=POST `
-        --oidc-service-account-email=$SA_EMAIL
+        --oidc-service-account-email=$SA_EMAIL `
+        --attempt-deadline=300s
 } else {
     Write-Host "Creating new Cloud Scheduler job '$TARGET_JOB'..."
     gcloud scheduler jobs create http $TARGET_JOB `
@@ -202,7 +203,8 @@ if ($jobExists) {
         --time-zone=$TARGET_TIMEZONE `
         --uri=$SERVICE_URL `
         --http-method=POST `
-        --oidc-service-account-email=$SA_EMAIL
+        --oidc-service-account-email=$SA_EMAIL `
+        --attempt-deadline=300s
 }
 
 Write-Host "`n==========================================================" -ForegroundColor Green

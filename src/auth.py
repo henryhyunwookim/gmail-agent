@@ -276,6 +276,9 @@ def authenticate_gmail(force_interactive: bool = False) -> Credentials:
             if token_data:
                 try:
                     token_scopes = token_data.get("scopes") or SCOPES
+                    missing_scopes = [s for s in SCOPES if s not in token_scopes]
+                    if missing_scopes:
+                        print(f"[AUTH] WARNING: Secret Manager token is missing required scope(s): {missing_scopes}")
                     creds = Credentials.from_authorized_user_info(token_data, scopes=token_scopes)
                 except Exception as e:
                     print(f"[AUTH] Error parsing token from Secret Manager: {e}")
